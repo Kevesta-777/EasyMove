@@ -1,0 +1,141 @@
+import { type QuoteParams, type QuoteResult, type VanSize } from '../../shared/types';
+import { buildPriceBreakdown } from '../../shared/pricing-rules';
+import { calculateDistance } from './distance-calculator';
+
+export class QuoteCalculationService {
+  static async calculateQuote(params: QuoteParams): Promise<QuoteResult> {
+    try {
+      // Validate inputs
+      this.validateInputs(params);
+
+      // Calculate distance if not provided
+      let distanceMiles = params.distanceMiles;
+      if (!distanceMiles && params.pickupAddress && params.deliveryAddress) {
+        const distanceResult = await calculateDistance(
+          params.pickupAddress,
+          params.deliveryAddress
+        );
+        distanceMiles = distanceResult.distance;
+      }
+
+      if (!distanceMiles) {
+        throw new Error('Distance is required for quote calculation');
+      }
+
+      // Build quote parameters
+      const quoteParams = {
+        distanceMiles,
+        vanSize: params.vanSize,
+        moveDate: params.moveDate,
+        moveTime: params.moveTime,
+        numHelpers: params.numHelpers,
+        estimatedHours: params.estimatedHours || this.estimateHours(distanceMiles, params.vanSize),
+        floorAccess: params.floorAccess,
+        liftAvailable: params.liftAvailable,
+        urgency: params.urgency,
+        inLondon: this.isInLondon(params.pickupAddress, params.deliveryAddress),
+        isUrban: this.isUrbanArea(params.pickupAddress, params.deliveryAddress)
+      };
+
+      // Calculate quote using pricing rules
+      const quote = buildPriceBreakdown(quoteParams);
+
+      // Add additional information to the quote
+      return {
+        ...quote,
+        subTotal: quote.totalPrice,
+        priceString: `£${quote.totalWithVAT.toFixed(2)}`,
+        explanation: this.generateExplanation(quote, params),
+        includesVAT: true
+      };
+    } catch (error) {
+      console.error('Error calculating quote:', error);
+      throw new Error('Failed to calculate quote: ' + (error as Error).message);
+    }
+  }
+
+  private static validateInputs(params: QuoteParams): void {
+    if (!params.vanSize) {
+      throw new Error('Van size is required');
+    }
+
+    if (!params.moveDate) {
+      throw new Error('Move date is required');
+    }
+
+    if (params.numHelpers < 0) {
+      throw new Error('Number of helpers cannot be negative');
+    }
+
+    if (params.estimatedHours < 0) {
+      throw new Error('Estimated hours cannot be negative');
+    }
+  }
+
+  private static estimateHours(distanceMiles: number, vanSize: VanSize): number {
+    // Base loading/unloading time based on van size
+    const loadingTime = {
+      small: 1,
+      medium: 1.5,
+      large: 2,
+      luton: 2.5
+    }[vanSize] || 1.5;
+
+    // Travel time estimation (average speed of 30 mph in urban areas)
+    const travelTime = distanceMiles / 30;
+
+    // Add buffer for traffic and other delays
+    const buffer = 0.5;
+
+    // Round up to nearest half hour
+    return Math.ceil((loadingTime + travelTime + buffer) * 2) / 2;
+  }
+
+  private static isUrbanArea(pickupAddress?: string, deliveryAddress?: string): boolean {
+    if (!pickupAddress && !deliveryAddress) return false;
+
+    // List of major UK cities
+    const urbanAreas = [
+      'london', 'manchester', 'birmingham', 'leeds', 'glasgow',
+      'liverpool', 'newcastle', 'sheffield', 'bristol', 'edinburgh'
+    ];
+
+    const addresses = [pickupAddress, deliveryAddress].filter(Boolean) as string[];
+    
+    return addresses.some(address => 
+      urbanAreas.some(city => 
+        address.toLowerCase().includes(city)
+      )
+    );
+  }
+
+  private static isInLondon(pickupAddress?: string, deliveryAddress?: string): boolean {
+    if (!pickupAddress && !deliveryAddress) return false;
+
+    const addresses = [pickupAddress, deliveryAddress].filter(Boolean) as string[];
+    
+    return addresses.some(address => 
+      address.toLowerCase().includes('london')
+    );
+  }
+
+  private static generateExplanation(quote: QuoteResult, params: QuoteParams): string {
+    let explanation = `£${quote.totalWithVAT.toFixed(2)} for a ${params.vanSize} van, ${params.distanceMiles.toFixed(1)} miles`;
+
+    if (params.numHelpers > 0) {
+      explanation += `, ${params.numHelpers} helper${params.numHelpers > 1 ? 's' : ''}`;
+    }
+
+    if (params.floorAccess !== 'ground') {
+      explanation += `, ${params.floorAccess} floor access${params.liftAvailable ? ' with lift' : ''}`;
+    }
+
+    if (params.urgency !== 'standard') {
+      explanation += `, ${params.urgency} service`;
+    }
+
+    explanation += `. Estimated time: ${quote.estimatedTime}.`;
+
+    return explanation;
+  }
+}

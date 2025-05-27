@@ -1207,4 +1207,53 @@ export default function StripeCheckout() {
 }
 `;
 
-/*
+/* --------------------------- EXPORT ---------------------------- */
+// Export the configuration and code samples for application deployment
+
+module.exports = {
+  config,
+  schema,
+  serverSetup,
+  pricingRules,
+  clientComponents,
+  deploymentInstructions: {
+    render: {
+      buildCommand: 'npm install && npm run build',
+      startCommand: 'npm run start',
+      environmentVariables: [
+        'NODE_ENV',
+        'STRIPE_SECRET_KEY',
+        'VITE_STRIPE_PUBLIC_KEY',
+        'STRIPE_WEBHOOK_SECRET',
+        'PAYPAL_CLIENT_ID',
+        'PAYPAL_CLIENT_SECRET',
+        'DATABASE_URL',
+        'GOOGLE_MAPS_API_KEY'
+      ]
+    },
+    instructions: `
+      # EasyMove Man and Van - Deployment Instructions
+      
+      ## Database Setup
+      1. Create a PostgreSQL database
+      2. Set DATABASE_URL environment variable
+      3. Run 'npm run db:push' to push schema
+      
+      ## Payment Setup
+      1. Add Stripe environment variables
+         - VITE_STRIPE_PUBLIC_KEY (starts with pk_)
+         - STRIPE_SECRET_KEY (starts with sk_)
+         - STRIPE_WEBHOOK_SECRET (optional, starts with whsec_)
+      2. Add PayPal environment variables
+         - PAYPAL_CLIENT_ID
+         - PAYPAL_CLIENT_SECRET
+      
+      ## Render Deployment
+      1. Connect your GitHub repository
+      2. Use the build command: npm install && npm run build
+      3. Use the start command: npm run start
+      4. Add all environment variables
+      5. Deploy the application
+    `
+  }
+};

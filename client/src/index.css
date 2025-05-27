@@ -1,0 +1,124 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Premium blue gradient color palette */
+  --background: 210 33% 99%;
+  --foreground: 222 47% 17%; /* #1F2937 Dark Text */
+  --muted: 210 20% 97%;
+  --muted-foreground: 215 20% 45%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 17%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 17%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --primary: 213 100% 41%; /* #0056D2 Strong Blue */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 214 100% 98%; /* #F4F8FF Accent Light */
+  --secondary-foreground: 222 47% 17%;
+  --accent: 213 94% 48%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --ring: 213 100% 41%;
+  --radius: 1rem; /* Rounded corners (2xl) */
+  --chart-1: 213 100% 41%;
+  --chart-2: 213 70% 50%;
+  --chart-3: 199 89% 48%;
+  --chart-4: 239 84% 67%;
+  --chart-5: 213 50% 60%;
+  --chart-6: 213 30% 70%;
+  --success: 142 76% 36%;
+  --success-foreground: 0 0% 100%;
+}
+
+.dark {
+  --background: 215 28% 12%;
+  --foreground: 0 0% 98%;
+  --muted: 215 28% 20%;
+  --muted-foreground: 215 20% 65%;
+  --popover: 215 28% 12%;
+  --popover-foreground: 0 0% 98%;
+  --card: 215 28% 17%;
+  --card-foreground: 0 0% 98%;
+  --border: 215 28% 25%;
+  --input: 215 28% 25%;
+  --primary: 211 100% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 28% 25%;
+  --secondary-foreground: 0 0% 98%;
+  --accent: 211 100% 55%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 62% 30%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 210 20% 80%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Open Sans', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', system-ui, sans-serif;
+    @apply font-semibold tracking-tight;
+  }
+}
+
+/* Component styling */
+@layer components {
+  .card {
+    @apply bg-card text-card-foreground rounded-2xl border shadow-lg hover:shadow-xl transition-all duration-200;
+  }
+  
+  .section {
+    @apply py-12 md:py-20;
+  }
+  
+  .btn-primary {
+    @apply bg-gradient-to-r from-primary to-[#0070FF] text-primary-foreground rounded-xl px-6 py-3 font-medium shadow-md 
+           hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 hover:brightness-105;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary text-primary rounded-xl px-6 py-3 font-medium shadow-sm 
+           hover:shadow-md hover:bg-secondary/90 transition-all duration-200 border border-primary/20;
+  }
+  
+  .form-card {
+    @apply bg-white p-8 rounded-2xl border shadow-lg;
+  }
+  
+  .price-card {
+    @apply bg-secondary p-8 rounded-2xl border-2 border-primary/20 shadow-lg;
+  }
+  
+  .quote-price {
+    @apply text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-[#0070FF] bg-clip-text text-transparent
+           transition-all duration-500;
+  }
+  
+  .quote-breakdown {
+    @apply text-sm md:text-base text-muted-foreground space-y-1;
+  }
+  
+  /* Add dot animation to list items with hoverable effect */
+  .animated-list-item {
+    @apply flex items-center transition-all duration-200;
+  }
+  
+  .animated-list-item-dot {
+    @apply w-1.5 h-1.5 bg-primary rounded-full mr-2 opacity-0 transform -translate-x-2 transition-all 
+           duration-200 group-hover:opacity-100 group-hover:translate-x-0;
+  }
+}
+
