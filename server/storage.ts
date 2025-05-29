@@ -27,6 +27,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getAllUsers(): Promise<User[]>;
 
   // Driver operations
   getDriver(id: number): Promise<Driver | undefined>;
@@ -34,6 +35,7 @@ export interface IStorage {
   createDriver(driver: InsertDriver): Promise<Driver>;
   approveDriver(id: number): Promise<Driver | undefined>;
   getDriversByLocation(location: string): Promise<Driver[]>;
+  getAllDrivers(): Promise<Driver[]>;
 
   // Booking operations
   getBooking(id: number): Promise<Booking | undefined>;
@@ -41,6 +43,8 @@ export interface IStorage {
   updateBookingStatus(id: number, status: string): Promise<Booking | undefined>;
   getBookingsByCustomer(customerId: number): Promise<Booking[]>;
   getBookingsByDriver(driverId: number): Promise<Booking[]>;
+  getAllBookings(): Promise<Booking[]>;
+  getAllBookingsWithDetails(): Promise<any[]>;
   
   // Pricing model operations
   getActivePricingModel(): Promise<PricingModel | undefined>;
@@ -71,6 +75,10 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users);
   }
 
   // Driver operations

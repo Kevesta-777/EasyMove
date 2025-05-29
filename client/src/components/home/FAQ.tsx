@@ -201,7 +201,7 @@ export default function FAQ() {
                 <Mail className="mr-2 h-5 w-5" /> Email Us
               </a>
               <a
-                href="tel:+441234567890"
+                href="tel:+447477 573794"
                 className="flex items-center justify-center bg-secondary/50 text-primary font-medium px-6 py-3 rounded-xl hover:bg-secondary/70 transition-colors duration-200 border border-primary/10"
               >
                 <PhoneCall className="mr-2 h-5 w-5" /> Call Us

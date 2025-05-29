@@ -1627,6 +1627,217 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin Authentication and Dashboard Routes
+  
+  // Admin login endpoint
+  app.post("/api/admin/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      // For demo purposes, use a simple admin check
+      // In production, implement proper password hashing
+      const adminUser = await storage.getUserByUsername(email);
+      
+      if (!adminUser || adminUser.role !== 'admin' || adminUser.password !== password) {
+        return res.status(401).json({ message: "Invalid admin credentials" });
+      }
+
+      // Create a simple session token (in production, use JWT)
+      const token = `admin_${adminUser.id}_${Date.now()}`;
+      
+      res.json({
+        token,
+        user: {
+          id: adminUser.id,
+          username: adminUser.username,
+          email: adminUser.email,
+          name: adminUser.username
+        },
+        role: adminUser.role
+      });
+    } catch (error) {
+      console.error("Admin login error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Admin dashboard stats
+  app.get("/api/admin/stats", async (req, res) => {
+    try {
+      // Get all bookings for statistics
+      const allBookings = await storage.getAllBookings();
+      const allUsers = await storage.getAllUsers();
+      const allDrivers = await storage.getAllDrivers();
+      
+      const today = new Date();
+      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+      
+      // Calculate statistics
+      const todayBookings = allBookings.filter(booking => {
+        const bookingDate = new Date(booking.createdAt);
+        return bookingDate.toDateString() === today.toDateString();
+      }).length;
+      
+      const thisWeekBookings = allBookings.filter(booking => {
+        const bookingDate = new Date(booking.createdAt);
+        return bookingDate >= weekAgo;
+      }).length;
+      
+      const thisMonthBookings = allBookings.filter(booking => {
+        const bookingDate = new Date(booking.createdAt);
+        return bookingDate >= monthAgo;
+      }).length;
+      
+      const newUsers = allUsers.filter(user => {
+        const userDate = new Date(user.createdAt);
+        return userDate >= weekAgo && user.role === 'customer';
+      }).length;
+      
+      const newDrivers = allDrivers.filter(driver => {
+        const driverDate = new Date(driver.createdAt);
+        return driverDate >= weekAgo;
+      }).length;
+      
+      const pendingDrivers = allDrivers.filter(driver => !driver.isApproved).length;
+      
+      const totalRevenue = allBookings.reduce((sum, booking) => {
+        return booking.status === 'completed' ? sum + booking.price : sum;
+      }, 0);
+
+      res.json({
+        totalBookings: allBookings.length,
+        newUsers,
+        newDrivers,
+        totalRevenue,
+        pendingDrivers,
+        activeComplaints: 0, // Placeholder for complaints system
+        todayBookings,
+        thisWeekBookings,
+        thisMonthBookings
+      });
+    } catch (error) {
+      console.error("Error fetching admin stats:", error);
+      res.status(500).json({ message: "Failed to fetch statistics" });
+    }
+  });
+
+  // Get all bookings with customer and driver details
+  app.get("/api/admin/bookings", async (req, res) => {
+    try {
+      const bookings = await storage.getAllBookingsWithDetails();
+      res.json(bookings);
+    } catch (error) {
+      console.error("Error fetching bookings:", error);
+      res.status(500).json({ message: "Failed to fetch bookings" });
+    }
+  });
+
+  // Get recent bookings for dashboard
+  app.get("/api/admin/recent-bookings", async (req, res) => {
+    try {
+      const bookings = await storage.getAllBookingsWithDetails();
+      // Get the 5 most recent bookings
+      const recentBookings = bookings
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5);
+      res.json(recentBookings);
+    } catch (error) {
+      console.error("Error fetching recent bookings:", error);
+      res.status(500).json({ message: "Failed to fetch recent bookings" });
+    }
+  });
+
+  // Get pending drivers for dashboard
+  app.get("/api/admin/pending-drivers", async (req, res) => {
+    try {
+      const drivers = await storage.getAllDrivers();
+      const pendingDrivers = drivers.filter(driver => !driver.isApproved);
+      res.json(pendingDrivers);
+    } catch (error) {
+      console.error("Error fetching pending drivers:", error);
+      res.status(500).json({ message: "Failed to fetch pending drivers" });
+    }
+  });
+
+  // Update booking status
+  app.post("/api/admin/booking/:id/update", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      
+      if (!status) {
+        return res.status(400).json({ message: "Status is required" });
+      }
+
+      const updatedBooking = await storage.updateBookingStatus(parseInt(id), status);
+      
+      if (!updatedBooking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      res.json(updatedBooking);
+    } catch (error) {
+      console.error("Error updating booking:", error);
+      res.status(500).json({ message: "Failed to update booking" });
+    }
+  });
+
+  // Get all users
+  app.get("/api/admin/users", async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      // Filter out admin users and sensitive data
+      const customerUsers = users
+        .filter(user => user.role === 'customer')
+        .map(user => ({
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          isActive: user.isActive,
+          createdAt: user.createdAt
+        }));
+      res.json(customerUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // Get all drivers
+  app.get("/api/admin/drivers", async (req, res) => {
+    try {
+      const drivers = await storage.getAllDrivers();
+      res.json(drivers);
+    } catch (error) {
+      console.error("Error fetching drivers:", error);
+      res.status(500).json({ message: "Failed to fetch drivers" });
+    }
+  });
+
+  // Approve/reject driver
+  app.post("/api/admin/driver/:id/verify", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { approved } = req.body;
+      
+      const driver = await storage.approveDriver(parseInt(id));
+      
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+
+      res.json(driver);
+    } catch (error) {
+      console.error("Error verifying driver:", error);
+      res.status(500).json({ message: "Failed to verify driver" });
+    }
+  });
+
   // Start background token refresh for faster first payment request
   setTimeout(async () => {
     try {
