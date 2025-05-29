@@ -118,6 +118,10 @@ export class DatabaseStorage implements IStorage {
       );
   }
 
+  async getAllDrivers(): Promise<Driver[]> {
+    return await db.select().from(drivers);
+  }
+
   // Booking operations
   async getBooking(id: number): Promise<Booking | undefined> {
     const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
@@ -150,6 +154,40 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(bookings)
       .where(eq(bookings.driverId, driverId));
+  }
+
+  async getAllBookings(): Promise<Booking[]> {
+    return await db.select().from(bookings);
+  }
+
+  async getAllBookingsWithDetails(): Promise<any[]> {
+    return await db
+      .select({
+        id: bookings.id,
+        collectionAddress: bookings.collectionAddress,
+        deliveryAddress: bookings.deliveryAddress,
+        moveDate: bookings.moveDate,
+        vanSize: bookings.vanSize,
+        price: bookings.price,
+        distance: bookings.distance,
+        urgency: bookings.urgency,
+        status: bookings.status,
+        createdAt: bookings.createdAt,
+        customer: {
+          id: users.id,
+          username: users.username,
+          email: users.email,
+        },
+        driver: {
+          id: drivers.id,
+          name: drivers.name,
+          phone: drivers.phone,
+          email: drivers.email,
+        },
+      })
+      .from(bookings)
+      .leftJoin(users, eq(bookings.customerId, users.id))
+      .leftJoin(drivers, eq(bookings.driverId, drivers.id));
   }
   
   // Pricing model operations
