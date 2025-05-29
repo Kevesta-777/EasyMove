@@ -1638,12 +1638,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email and password are required" });
       }
 
-      // For demo purposes, use a simple admin check
-      // In production, implement proper password hashing
-      const adminUser = await storage.getUserByUsername(email);
+      // Check for admin user (username 'admin' with correct password)
+      const adminUser = await storage.getUserByUsername(email === 'admin@easymove.com' ? 'admin' : email);
       
-      if (!adminUser || adminUser.role !== 'admin' || adminUser.password !== password) {
+      if (!adminUser || adminUser.password !== password) {
         return res.status(401).json({ message: "Invalid admin credentials" });
+      }
+
+      // Only allow admin user to access admin portal
+      if (adminUser.username !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
       }
 
       // Create a simple session token (in production, use JWT)
@@ -1654,10 +1658,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user: {
           id: adminUser.id,
           username: adminUser.username,
-          email: adminUser.email,
-          name: adminUser.username
+          email: 'admin@easymove.com',
+          name: 'Administrator'
         },
-        role: adminUser.role
+        role: 'admin'
       });
     } catch (error) {
       console.error("Admin login error:", error);
