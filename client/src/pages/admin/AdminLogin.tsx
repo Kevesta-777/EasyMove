@@ -26,8 +26,9 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      // Simple client-side authentication for demo
+      // Simple client-side authentication - you can customize these credentials
       const validCredentials = [
+        { email: 'manager@easymove.com', password: 'secure2025' },
         { email: 'admin@easymove.com', password: 'admin123' },
         { email: 'admin', password: 'admin123' }
       ];
