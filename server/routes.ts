@@ -1924,6 +1924,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin driver management routes
+  app.get("/api/admin/drivers", async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { drivers } = await import("@shared/schema");
+
+      const allDrivers = await db.select().from(drivers);
+      
+      res.json(allDrivers);
+    } catch (error) {
+      console.error("Error fetching drivers:", error);
+      res.status(500).json({ message: "Failed to fetch drivers" });
+    }
+  });
+
+  // Approve driver
+  app.post("/api/admin/drivers/:id/approve", async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { drivers } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      const driverId = parseInt(req.params.id);
+      
+      const [updatedDriver] = await db
+        .update(drivers)
+        .set({ isApproved: true, isActive: true })
+        .where(eq(drivers.id, driverId))
+        .returning();
+
+      if (!updatedDriver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+
+      console.log(`Driver ${updatedDriver.firstName} ${updatedDriver.lastName} approved`);
+
+      res.json({
+        message: "Driver approved successfully",
+        driver: updatedDriver
+      });
+    } catch (error) {
+      console.error("Error approving driver:", error);
+      res.status(500).json({ message: "Failed to approve driver" });
+    }
+  });
+
+  // Decline driver
+  app.post("/api/admin/drivers/:id/decline", async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { drivers } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      const driverId = parseInt(req.params.id);
+      
+      const [updatedDriver] = await db
+        .update(drivers)
+        .set({ isApproved: false, isActive: false })
+        .where(eq(drivers.id, driverId))
+        .returning();
+
+      if (!updatedDriver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+
+      console.log(`Driver ${updatedDriver.firstName} ${updatedDriver.lastName} declined`);
+
+      res.json({
+        message: "Driver declined",
+        driver: updatedDriver
+      });
+    } catch (error) {
+      console.error("Error declining driver:", error);
+      res.status(500).json({ message: "Failed to decline driver" });
+    }
+  });
+
   // Start background token refresh for faster first payment request
   setTimeout(async () => {
     try {

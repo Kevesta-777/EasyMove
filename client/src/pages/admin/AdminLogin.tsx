@@ -26,7 +26,13 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      const response = await apiRequest('POST', '/api/admin/login', credentials);
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials)
+      });
       
       if (response.ok) {
         const data = await response.json();

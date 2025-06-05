@@ -20,6 +20,7 @@ import AdminLogin from "@/pages/admin/AdminLogin";
 import AdminSignup from "@/pages/admin/AdminSignup";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminBookings from "@/pages/admin/AdminBookings";
+import AdminDrivers from "@/pages/admin/AdminDrivers";
 
 import BookingConfirmation from "@/pages/BookingConfirmation";
 import StripeConfig from "@/pages/StripeConfig";
@@ -56,6 +57,7 @@ function Router() {
       <Route path="/admin/signup" component={AdminSignup} />
       <Route path="/admin/dashboard" component={AdminDashboard} />
       <Route path="/admin/bookings" component={AdminBookings} />
+      <Route path="/admin/drivers" component={AdminDrivers} />
       <Route component={NotFound} />
     </Switch>
   );
