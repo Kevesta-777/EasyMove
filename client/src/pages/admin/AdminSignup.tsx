@@ -44,11 +44,17 @@ export default function AdminSignup() {
     }
 
     try {
-      const response = await apiRequest('POST', '/api/admin/signup', {
-        username: formData.username,
-        email: formData.email,
-        password: formData.password,
-        adminKey: formData.adminKey
+      const response = await fetch('/api/admin/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+          adminKey: formData.adminKey
+        })
       });
       
       if (response.ok) {
