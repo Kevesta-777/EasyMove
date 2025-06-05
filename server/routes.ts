@@ -1632,35 +1632,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin login endpoint
   app.post("/api/admin/login", async (req, res) => {
     try {
+      console.log('Admin login attempt:', req.body);
       const { email, password } = req.body;
       
       if (!email || !password) {
+        console.log('Missing email or password');
         return res.status(400).json({ message: "Email and password are required" });
       }
 
-      // For demo purposes, use a simple admin check
-      // In production, implement proper password hashing
-      let adminUser;
-      try {
-        adminUser = await storage.getUserByEmail(email);
-        if (!adminUser) {
-          adminUser = await storage.getUserByUsername(email);
-        }
-      } catch (error) {
-        console.error('Database error during login:', error);
-        return res.status(500).json({ message: "Database error" });
+      // Check if user exists by email first, then by username
+      console.log('Looking for user with email:', email);
+      let adminUser = await storage.getUserByEmail(email);
+      
+      if (!adminUser) {
+        console.log('User not found by email, trying username');
+        adminUser = await storage.getUserByUsername(email);
       }
       
-      if (!adminUser || adminUser.role !== 'admin' || adminUser.password !== password) {
-        console.log('Login failed:', { 
-          userFound: !!adminUser, 
-          role: adminUser?.role, 
-          email: email,
-          passwordMatch: adminUser?.password === password 
-        });
+      console.log('User found:', {
+        id: adminUser?.id,
+        username: adminUser?.username,
+        email: adminUser?.email,
+        role: adminUser?.role,
+        hasPassword: !!adminUser?.password
+      });
+      
+      if (!adminUser) {
+        console.log('No user found with email or username:', email);
+        return res.status(401).json({ message: "Invalid admin credentials" });
+      }
+      
+      if (adminUser.role !== 'admin') {
+        console.log('User found but not admin role:', adminUser.role);
+        return res.status(401).json({ message: "Invalid admin credentials" });
+      }
+      
+      if (adminUser.password !== password) {
+        console.log('Password mismatch. Expected:', adminUser.password, 'Got:', password);
         return res.status(401).json({ message: "Invalid admin credentials" });
       }
 
+      console.log('Login successful for user:', adminUser.username);
+      
       // Create a simple session token (in production, use JWT)
       const token = `admin_${adminUser.id}_${Date.now()}`;
       
