@@ -1646,9 +1646,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid admin registration key" });
       }
 
-      // Check if user already exists
-      const existingUserByEmail = await storage.getUserByEmail(email);
-      const existingUserByUsername = await storage.getUserByUsername(username);
+      // Check if user already exists using direct database queries
+      const { db } = await import("./db");
+      const { users } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+
+      const [existingUserByEmail] = await db.select().from(users).where(eq(users.email, email));
+      const [existingUserByUsername] = await db.select().from(users).where(eq(users.username, username));
       
       if (existingUserByEmail) {
         return res.status(409).json({ message: "Email already registered" });
@@ -1659,13 +1663,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create admin user (in production, hash the password)
-      const newAdmin = await storage.createUser({
+      const [newAdmin] = await db.insert(users).values({
         username,
         email,
         password, // In production, use bcrypt to hash this
         role: 'admin',
         isActive: true
-      });
+      }).returning();
 
       console.log('Admin account created successfully:', newAdmin.username);
 
