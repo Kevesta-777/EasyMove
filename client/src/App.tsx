@@ -16,9 +16,6 @@ import PaymentTester from "@/pages/PaymentTester";
 import DetailedQuote from "@/pages/DetailedQuote";
 import TestDetailedQuotes from "@/pages/TestDetailedQuotes";
 import BookingTracker from "@/pages/BookingTracker";
-import AdminLogin from "@/pages/admin/AdminLogin";
-import AdminDashboard from "@/pages/admin/AdminDashboard";
-import AdminBookings from "@/pages/admin/AdminBookings";
 
 import BookingConfirmation from "@/pages/BookingConfirmation";
 import StripeConfig from "@/pages/StripeConfig";
@@ -51,9 +48,6 @@ function Router() {
       <Route path="/quote" component={DetailedQuote} />
       <Route path="/test-detailed-quotes" component={TestDetailedQuotes} />
       <Route path="/booking-tracker" component={BookingTracker} />
-      <Route path="/admin/login" component={AdminLogin} />
-      <Route path="/admin/dashboard" component={AdminDashboard} />
-      <Route path="/admin/bookings" component={AdminBookings} />
       <Route component={NotFound} />
     </Switch>
   );
