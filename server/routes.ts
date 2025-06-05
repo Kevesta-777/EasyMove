@@ -1640,9 +1640,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // For demo purposes, use a simple admin check
       // In production, implement proper password hashing
-      const adminUser = await storage.getUserByUsername(email);
+      const adminUser = await storage.getUserByEmail ? 
+        await storage.getUserByEmail(email) : 
+        await storage.getUserByUsername(email);
       
       if (!adminUser || adminUser.role !== 'admin' || adminUser.password !== password) {
+        console.log('Login failed:', { 
+          userFound: !!adminUser, 
+          role: adminUser?.role, 
+          email: email,
+          passwordMatch: adminUser?.password === password 
+        });
         return res.status(401).json({ message: "Invalid admin credentials" });
       }
 
