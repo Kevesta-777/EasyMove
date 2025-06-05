@@ -159,8 +159,14 @@ export default function AdminLogin() {
         </Card>
 
         <div className="mt-6 text-center text-sm text-gray-500">
-          <p>Authorized personnel only</p>
-          <p className="mt-1">Contact IT support if you need access</p>
+          <p>Need an admin account?</p>
+          <Button 
+            variant="link" 
+            onClick={() => setLocation('/admin/signup')}
+            className="p-0 h-auto font-normal text-primary"
+          >
+            Create admin account
+          </Button>
         </div>
       </div>
     </div>

@@ -17,6 +17,7 @@ import DetailedQuote from "@/pages/DetailedQuote";
 import TestDetailedQuotes from "@/pages/TestDetailedQuotes";
 import BookingTracker from "@/pages/BookingTracker";
 import AdminLogin from "@/pages/admin/AdminLogin";
+import AdminSignup from "@/pages/admin/AdminSignup";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminBookings from "@/pages/admin/AdminBookings";
 
@@ -52,6 +53,7 @@ function Router() {
       <Route path="/test-detailed-quotes" component={TestDetailedQuotes} />
       <Route path="/booking-tracker" component={BookingTracker} />
       <Route path="/admin/login" component={AdminLogin} />
+      <Route path="/admin/signup" component={AdminSignup} />
       <Route path="/admin/dashboard" component={AdminDashboard} />
       <Route path="/admin/bookings" component={AdminBookings} />
       <Route component={NotFound} />

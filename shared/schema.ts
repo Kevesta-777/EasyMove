@@ -18,9 +18,9 @@ export const usersRelations = relations(users, ({ many }) => ({
   bookings: many(bookings),
 }));
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
 });
 
 // Define detailed item schema

@@ -1629,6 +1629,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Admin Authentication and Dashboard Routes
   
+  // Admin signup endpoint
+  app.post("/api/admin/signup", async (req, res) => {
+    try {
+      console.log('Admin signup attempt:', req.body);
+      const { username, email, password, adminKey } = req.body;
+      
+      if (!username || !email || !password || !adminKey) {
+        return res.status(400).json({ message: "All fields are required" });
+      }
+
+      // Verify admin registration key (use environment variable for security)
+      const validAdminKey = process.env.ADMIN_REGISTRATION_KEY || 'easymove2025';
+      if (adminKey !== validAdminKey) {
+        console.log('Invalid admin key provided:', adminKey);
+        return res.status(401).json({ message: "Invalid admin registration key" });
+      }
+
+      // Check if user already exists
+      const existingUserByEmail = await storage.getUserByEmail(email);
+      const existingUserByUsername = await storage.getUserByUsername(username);
+      
+      if (existingUserByEmail) {
+        return res.status(409).json({ message: "Email already registered" });
+      }
+      
+      if (existingUserByUsername) {
+        return res.status(409).json({ message: "Username already taken" });
+      }
+
+      // Create admin user (in production, hash the password)
+      const newAdmin = await storage.createUser({
+        username,
+        email,
+        password, // In production, use bcrypt to hash this
+        role: 'admin',
+        isActive: true
+      });
+
+      console.log('Admin account created successfully:', newAdmin.username);
+
+      res.status(201).json({
+        message: "Admin account created successfully",
+        user: {
+          id: newAdmin.id,
+          username: newAdmin.username,
+          email: newAdmin.email,
+          role: newAdmin.role
+        }
+      });
+    } catch (error) {
+      console.error("Admin signup error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Admin login endpoint
   app.post("/api/admin/login", async (req, res) => {
     try {
