@@ -418,6 +418,32 @@ router.post("/api/create-payment", async (req, res) => {
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Add CORS headers for all routes to support your production domain
+  app.use((req, res, next) => {
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:5000', 
+      'https://easymovevan.co.uk',
+      'https://www.easymovevan.co.uk'
+    ];
+    
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin as string)) {
+      res.setHeader('Access-Control-Allow-Origin', origin as string);
+    }
+    
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    
+    // Handle preflight OPTIONS requests
+    if (req.method === 'OPTIONS') {
+      res.status(200).end();
+      return;
+    }
+    
+    next();
+  });
   app.use(router);
   // Health check route for deployment monitoring
   app.get("/api/health", (req, res) => {
