@@ -418,32 +418,6 @@ router.post("/api/create-payment", async (req, res) => {
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Add CORS headers for all routes to support your production domain
-  app.use((req, res, next) => {
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:5000', 
-      'https://easymovevan.co.uk',
-      'https://www.easymovevan.co.uk'
-    ];
-    
-    const origin = req.headers.origin;
-    if (allowedOrigins.includes(origin as string)) {
-      res.setHeader('Access-Control-Allow-Origin', origin as string);
-    }
-    
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    
-    // Handle preflight OPTIONS requests
-    if (req.method === 'OPTIONS') {
-      res.status(200).end();
-      return;
-    }
-    
-    next();
-  });
   app.use(router);
   // Health check route for deployment monitoring
   app.get("/api/health", (req, res) => {
@@ -1655,7 +1629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Admin Authentication and Dashboard Routes
   
-  // Admin login endpoint - simplified for reliable access
+  // Admin login endpoint
   app.post("/api/admin/login", async (req, res) => {
     try {
       const { email, password } = req.body;
@@ -1664,32 +1638,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email and password are required" });
       }
 
-      // Simple admin authentication without database dependency
-      const validAdminCredentials = [
-        { email: 'admin@easymove.com', password: 'admin123' },
-        { email: 'admin', password: 'admin123' }
-      ];
-
-      const isValidAdmin = validAdminCredentials.some(cred => 
-        cred.email === email && cred.password === password
-      );
-
-      if (!isValidAdmin) {
+      // For demo purposes, use a simple admin check
+      // In production, implement proper password hashing
+      const adminUser = await storage.getUserByUsername(email);
+      
+      if (!adminUser || adminUser.role !== 'admin' || adminUser.password !== password) {
         return res.status(401).json({ message: "Invalid admin credentials" });
       }
 
-      // Create a simple session token
-      const token = `admin_session_${Date.now()}`;
+      // Create a simple session token (in production, use JWT)
+      const token = `admin_${adminUser.id}_${Date.now()}`;
       
       res.json({
         token,
         user: {
-          id: 1,
-          username: 'admin',
-          email: 'admin@easymove.com',
-          name: 'Administrator'
+          id: adminUser.id,
+          username: adminUser.username,
+          email: adminUser.email,
+          name: adminUser.username
         },
-        role: 'admin'
+        role: adminUser.role
       });
     } catch (error) {
       console.error("Admin login error:", error);
@@ -1697,20 +1665,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin dashboard stats - simplified for reliable access
+  // Admin dashboard stats
   app.get("/api/admin/stats", async (req, res) => {
     try {
-      // Return mock stats for demonstration (in production, would fetch from database)
+      // Get all bookings for statistics
+      const allBookings = await storage.getAllBookings();
+      const allUsers = await storage.getAllUsers();
+      const allDrivers = await storage.getAllDrivers();
+      
+      const today = new Date();
+      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+      
+      // Calculate statistics
+      const todayBookings = allBookings.filter(booking => {
+        const bookingDate = new Date(booking.createdAt);
+        return bookingDate.toDateString() === today.toDateString();
+      }).length;
+      
+      const thisWeekBookings = allBookings.filter(booking => {
+        const bookingDate = new Date(booking.createdAt);
+        return bookingDate >= weekAgo;
+      }).length;
+      
+      const thisMonthBookings = allBookings.filter(booking => {
+        const bookingDate = new Date(booking.createdAt);
+        return bookingDate >= monthAgo;
+      }).length;
+      
+      const newUsers = allUsers.filter(user => {
+        const userDate = new Date(user.createdAt);
+        return userDate >= weekAgo && user.role === 'customer';
+      }).length;
+      
+      const newDrivers = allDrivers.filter(driver => {
+        const driverDate = new Date(driver.createdAt);
+        return driverDate >= weekAgo;
+      }).length;
+      
+      const pendingDrivers = allDrivers.filter(driver => !driver.isApproved).length;
+      
+      const totalRevenue = allBookings.reduce((sum, booking) => {
+        return booking.status === 'completed' ? sum + booking.price : sum;
+      }, 0);
+
       res.json({
-        totalBookings: 247,
-        newUsers: 12,
-        newDrivers: 3,
-        totalRevenue: 15420,
-        pendingDrivers: 2,
-        activeComplaints: 0,
-        todayBookings: 8,
-        thisWeekBookings: 23,
-        thisMonthBookings: 87
+        totalBookings: allBookings.length,
+        newUsers,
+        newDrivers,
+        totalRevenue,
+        pendingDrivers,
+        activeComplaints: 0, // Placeholder for complaints system
+        todayBookings,
+        thisWeekBookings,
+        thisMonthBookings
       });
     } catch (error) {
       console.error("Error fetching admin stats:", error);
@@ -1718,48 +1726,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all bookings - simplified for reliable access
+  // Get all bookings with customer and driver details
   app.get("/api/admin/bookings", async (req, res) => {
     try {
-      const mockBookings = [
-        {
-          id: 1,
-          customer: { username: 'john_doe', email: 'john@example.com' },
-          collectionAddress: '123 Oxford Street, London W1D 2HX',
-          deliveryAddress: '456 Baker Street, London NW1 6XE',
-          moveDate: '2025-06-01',
-          vanSize: 'medium',
-          price: 15300,
-          distance: 5,
-          status: 'completed',
-          createdAt: '2025-05-29T10:30:00Z'
-        },
-        {
-          id: 2,
-          customer: { username: 'sarah_smith', email: 'sarah@example.com' },
-          collectionAddress: '789 Deansgate, Manchester M3 2BW',
-          deliveryAddress: '321 King Street, Manchester M2 6AZ',
-          moveDate: '2025-06-02',
-          vanSize: 'large',
-          price: 18500,
-          distance: 8,
-          status: 'pending',
-          createdAt: '2025-05-29T14:15:00Z'
-        },
-        {
-          id: 3,
-          customer: { username: 'mike_jones', email: 'mike@example.com' },
-          collectionAddress: '101 Bull Ring, Birmingham B5 4BU',
-          deliveryAddress: '202 New Street, Birmingham B2 4QA',
-          moveDate: '2025-06-03',
-          vanSize: 'small',
-          price: 12700,
-          distance: 3,
-          status: 'in_progress',
-          createdAt: '2025-05-29T16:45:00Z'
-        }
-      ];
-      res.json(mockBookings);
+      const bookings = await storage.getAllBookingsWithDetails();
+      res.json(bookings);
     } catch (error) {
       console.error("Error fetching bookings:", error);
       res.status(500).json({ message: "Failed to fetch bookings" });
@@ -1769,22 +1740,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get recent bookings for dashboard
   app.get("/api/admin/recent-bookings", async (req, res) => {
     try {
-      const recentBookings = [
-        {
-          id: 1,
-          customer: { username: 'john_doe' },
-          collectionAddress: '123 Oxford Street, London',
-          deliveryAddress: '456 Baker Street, London',
-          status: 'completed'
-        },
-        {
-          id: 2,
-          customer: { username: 'sarah_smith' },
-          collectionAddress: '789 Deansgate, Manchester',
-          deliveryAddress: '321 King Street, Manchester',
-          status: 'pending'
-        }
-      ];
+      const bookings = await storage.getAllBookingsWithDetails();
+      // Get the 5 most recent bookings
+      const recentBookings = bookings
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5);
       res.json(recentBookings);
     } catch (error) {
       console.error("Error fetching recent bookings:", error);
@@ -1795,15 +1755,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get pending drivers for dashboard
   app.get("/api/admin/pending-drivers", async (req, res) => {
     try {
-      const pendingDrivers = [
-        {
-          id: 2,
-          name: 'Emma Thompson',
-          email: 'emma.thompson@email.com',
-          vanType: 'large',
-          isApproved: false
-        }
-      ];
+      const drivers = await storage.getAllDrivers();
+      const pendingDrivers = drivers.filter(driver => !driver.isApproved);
       res.json(pendingDrivers);
     } catch (error) {
       console.error("Error fetching pending drivers:", error);
@@ -1821,12 +1774,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Status is required" });
       }
 
-      // Return success response for demo
-      res.json({
-        id: parseInt(id),
-        status,
-        message: 'Booking status updated successfully'
-      });
+      const updatedBooking = await storage.updateBookingStatus(parseInt(id), status);
+      
+      if (!updatedBooking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      res.json(updatedBooking);
     } catch (error) {
       console.error("Error updating booking:", error);
       res.status(500).json({ message: "Failed to update booking" });
@@ -1836,23 +1790,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all users
   app.get("/api/admin/users", async (req, res) => {
     try {
-      const mockUsers = [
-        {
-          id: 1,
-          username: 'john_doe',
-          email: 'john@example.com',
-          isActive: true,
-          createdAt: '2025-05-15T09:00:00Z'
-        },
-        {
-          id: 2,
-          username: 'sarah_smith',
-          email: 'sarah@example.com',
-          isActive: true,
-          createdAt: '2025-05-20T11:30:00Z'
-        }
-      ];
-      res.json(mockUsers);
+      const users = await storage.getAllUsers();
+      // Filter out admin users and sensitive data
+      const customerUsers = users
+        .filter(user => user.role === 'customer')
+        .map(user => ({
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          isActive: user.isActive,
+          createdAt: user.createdAt
+        }));
+      res.json(customerUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
@@ -1862,27 +1811,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all drivers
   app.get("/api/admin/drivers", async (req, res) => {
     try {
-      const mockDrivers = [
-        {
-          id: 1,
-          name: 'David Wilson',
-          email: 'david.wilson@email.com',
-          phone: '+44 7700 123456',
-          vanType: 'medium',
-          isApproved: true,
-          completedJobs: 45
-        },
-        {
-          id: 2,
-          name: 'Emma Thompson',
-          email: 'emma.thompson@email.com',
-          phone: '+44 7700 234567',
-          vanType: 'large',
-          isApproved: false,
-          completedJobs: 0
-        }
-      ];
-      res.json(mockDrivers);
+      const drivers = await storage.getAllDrivers();
+      res.json(drivers);
     } catch (error) {
       console.error("Error fetching drivers:", error);
       res.status(500).json({ message: "Failed to fetch drivers" });
@@ -1895,12 +1825,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { approved } = req.body;
       
-      // Return success response for demo
-      res.json({
-        id: parseInt(id),
-        approved,
-        message: 'Driver verification status updated successfully'
-      });
+      const driver = await storage.approveDriver(parseInt(id));
+      
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+
+      res.json(driver);
     } catch (error) {
       console.error("Error verifying driver:", error);
       res.status(500).json({ message: "Failed to verify driver" });

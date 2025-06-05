@@ -26,45 +26,34 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      // Simple client-side authentication - you can customize these credentials
-      const validCredentials = [
-        { email: 'manager@easymove.com', password: 'secure2025' },
-        { email: 'admin@easymove.com', password: 'admin123' },
-        { email: 'admin', password: 'admin123' }
-      ];
-
-      const isValid = validCredentials.some(cred => 
-        cred.email === credentials.email && cred.password === credentials.password
-      );
-
-      if (isValid) {
+      const response = await apiRequest('POST', '/api/admin/login', credentials);
+      
+      if (response.ok) {
+        const data = await response.json();
+        
         // Store admin session
         localStorage.setItem('adminAuth', JSON.stringify({
-          token: `admin_session_${Date.now()}`,
-          user: {
-            id: 1,
-            username: 'admin',
-            email: credentials.email,
-            name: 'Administrator'
-          },
-          role: 'admin',
+          token: data.token,
+          user: data.user,
+          role: data.role,
           loginTime: new Date().toISOString()
         }));
 
         toast({
           title: "Login Successful",
-          description: "Welcome to the admin dashboard",
+          description: `Welcome back, ${data.user.name}`,
           variant: "default",
         });
 
         // Redirect to admin dashboard
         setLocation('/admin/dashboard');
       } else {
-        setError('Invalid admin credentials');
+        const errorData = await response.json();
+        setError(errorData.message || 'Invalid credentials');
       }
     } catch (error) {
       console.error('Login error:', error);
-      setError('Login failed. Please try again.');
+      setError('Failed to connect to server. Please try again.');
     } finally {
       setLoading(false);
     }
