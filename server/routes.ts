@@ -1950,7 +1950,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const [updatedDriver] = await db
         .update(drivers)
-        .set({ isApproved: true, isActive: true })
+        .set({ isApproved: true })
         .where(eq(drivers.id, driverId))
         .returning();
 
@@ -1958,7 +1958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Driver not found" });
       }
 
-      console.log(`Driver ${updatedDriver.firstName} ${updatedDriver.lastName} approved`);
+      console.log(`Driver ${updatedDriver.name} approved`);
 
       res.json({
         message: "Driver approved successfully",
@@ -1981,7 +1981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const [updatedDriver] = await db
         .update(drivers)
-        .set({ isApproved: false, isActive: false })
+        .set({ isApproved: false })
         .where(eq(drivers.id, driverId))
         .returning();
 
@@ -1989,7 +1989,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Driver not found" });
       }
 
-      console.log(`Driver ${updatedDriver.firstName} ${updatedDriver.lastName} declined`);
+      console.log(`Driver ${updatedDriver.name} declined`);
 
       res.json({
         message: "Driver declined",

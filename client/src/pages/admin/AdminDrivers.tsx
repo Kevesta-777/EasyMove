@@ -90,17 +90,19 @@ export default function AdminDrivers() {
   };
 
   const getStatusBadge = (driver: Driver) => {
-    if (!driver.isApproved && driver.isActive) {
+    if (driver.isApproved === null) {
       return <Badge variant="outline" className="text-yellow-600 border-yellow-600"><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
     }
-    if (driver.isApproved && driver.isActive) {
+    if (driver.isApproved === true) {
       return <Badge variant="outline" className="text-green-600 border-green-600"><CheckCircle className="w-3 h-3 mr-1" />Approved</Badge>;
     }
     return <Badge variant="outline" className="text-red-600 border-red-600"><XCircle className="w-3 h-3 mr-1" />Declined</Badge>;
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-GB', {
+  const formatDate = (dateValue: string | Date | null) => {
+    if (!dateValue) return 'Unknown';
+    const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
+    return date.toLocaleDateString('en-GB', {
       day: '2-digit',
       month: '2-digit', 
       year: 'numeric',
@@ -155,7 +157,7 @@ export default function AdminDrivers() {
                         <User className="h-5 w-5 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-lg">{driver.firstName} {driver.lastName}</CardTitle>
+                        <CardTitle className="text-lg">{driver.name}</CardTitle>
                         <CardDescription>Applied on {formatDate(driver.createdAt)}</CardDescription>
                       </div>
                     </div>
@@ -174,7 +176,7 @@ export default function AdminDrivers() {
                     </div>
                     <div className="flex items-center space-x-2">
                       <Car className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm text-gray-600">{driver.vehicleType}</span>
+                      <span className="text-sm text-gray-600">{driver.vanType}</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <MapPin className="h-4 w-4 text-gray-500" />
@@ -182,11 +184,11 @@ export default function AdminDrivers() {
                     </div>
                     <div className="flex items-center space-x-2">
                       <FileText className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm text-gray-600">License: {driver.licenseNumber}</span>
+                      <span className="text-sm text-gray-600">Experience: {driver.experience}</span>
                     </div>
                   </div>
 
-                  {!driver.isApproved && driver.isActive && (
+                  {driver.isApproved === null && (
                     <div className="flex space-x-3">
                       <Button
                         onClick={() => handleDriverAction(driver.id, 'approve')}
@@ -206,7 +208,7 @@ export default function AdminDrivers() {
                     </div>
                   )}
 
-                  {driver.isApproved && (
+                  {driver.isApproved === true && (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                       <div className="flex items-center">
                         <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
@@ -215,7 +217,7 @@ export default function AdminDrivers() {
                     </div>
                   )}
 
-                  {!driver.isActive && (
+                  {driver.isApproved === false && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                       <div className="flex items-center">
                         <XCircle className="h-4 w-4 text-red-600 mr-2" />
