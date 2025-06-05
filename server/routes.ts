@@ -1699,14 +1699,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email and password are required" });
       }
 
-      // Check if user exists by email first, then by username
+      // Find user by email using direct database query
+      const { db } = await import("./db");
+      const { users } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+
       console.log('Looking for user with email:', email);
-      let adminUser = await storage.getUserByEmail(email);
-      
-      if (!adminUser) {
-        console.log('User not found by email, trying username');
-        adminUser = await storage.getUserByUsername(email);
-      }
+      const [adminUser] = await db.select().from(users).where(eq(users.email, email));
       
       console.log('User found:', {
         id: adminUser?.id,
