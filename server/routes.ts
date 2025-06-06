@@ -28,7 +28,7 @@ function initializeStripe(secretKey?: string) {
       return false;
     }
     
-    stripe = new Stripe(keyToUse, { apiVersion: "2025-04-30.basil" });
+    stripe = new Stripe(keyToUse, { apiVersion: "2024-11-20.acacia" });
     stripeEnabled = true;
     console.log("Stripe initialized successfully");
     return true;
@@ -134,14 +134,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const breakdown = buildPriceBreakdown({
         distanceMiles: distanceResult.distance,
         vanSize: validatedData.vanSize,
-        estimatedHours: distanceResult.estimatedTime,
-        numHelpers: validatedData.helpers || 0,
         floorAccess: validatedData.floorAccess || "ground",
-        liftAvailable: false,
-        moveDate: new Date(validatedData.moveDate),
-        moveTime: "09:00",
         urgency: validatedData.urgency || "standard",
-        inLondon: false
+        moveDate: new Date(validatedData.moveDate),
+        timeString: "09:00"
       });
 
       res.json({

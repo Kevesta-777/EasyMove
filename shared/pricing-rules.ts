@@ -64,11 +64,9 @@ export const PRICING_CONSTANTS = {
   // Access charges
   FLOOR_ACCESS_FEES: {
     ground: 0,
-    first: 10, // £10 for first floor
-    second: 20, // £20 for second floor
-    third: 30, // £30 for third floor
-    fourth: 40, // £40 for fourth floor
-    above_fourth: 50, // £50 for above fourth floor
+    firstFloor: 10, // £10 for first floor
+    secondFloor: 20, // £20 for second floor
+    thirdFloorPlus: 30, // £30 for third floor or higher
   },
   LIFT_DISCOUNT: 0.5, // 50% discount if lift is available
 
