@@ -564,8 +564,9 @@ export function buildPriceBreakdown(params: {
     distanceCharge,
   );
 
-  // Calculate additional fees
-  const helpersFee = calculateHelperFee(numHelpers, estimatedHours);
+  // Calculate additional fees with proper defaults
+  const validEstimatedHours = estimatedHours || estimateTravelTime(distanceMiles, moveDate);
+  const helpersFee = calculateHelperFee(numHelpers || 0, validEstimatedHours);
   const floorAccessFee = calculateFloorAccessFee(floorAccess, liftAvailable);
   const fuelCost = calculateFuelCost(distanceMiles, vanSize);
   const congestionCharge = inLondon ? PRICING_CONSTANTS.CONGESTION_CHARGE : 0;
@@ -642,7 +643,7 @@ export function buildPriceBreakdown(params: {
   //   vanSize,
   //   floorAccess !== "ground" && !liftAvailable,
   // );
-  const totalTime = estimatedHours;
+  const totalTime = validEstimatedHours;
   const estimatedTime = formatDuration(totalTime);
   return {
     totalPrice,
