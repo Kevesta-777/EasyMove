@@ -312,8 +312,8 @@ export function calculateReturnJourneyCost(
   );
   const sizeFactor = calculateVanSizeMultiplier(vanSize);
 
-  // Use the lowest per-mile rate for return journey (more efficient, less traffic)
-  const returnRate = PRICING_CONSTANTS.BASE_RATE_PER_MILE_MIN;
+  // Use the base per-mile rate for return journey calculation
+  const returnRate = PRICING_CONSTANTS.BASE_RATE_PER_MILE;
 
   // Apply size factor to the rate
   const adjustedRate = returnRate * sizeFactor;
