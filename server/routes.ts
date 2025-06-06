@@ -119,21 +119,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Calculate quote using the distance
-      const quote = calculateSimpleQuote({
+      const quoteResult = calculateSimpleQuote({
         distanceMiles: distanceResult.distance,
         vanSize: validatedData.vanSize,
         moveDate: new Date(validatedData.moveDate)
       });
 
+      const totalPrice = typeof quoteResult === 'number' ? quoteResult : 150;
+
       res.json({
         quote: {
-          total: quote,
+          total: totalPrice,
           distance: distanceResult,
           currency: "GBP",
           breakdown: {
-            basePrice: Math.round(quote * 0.7 * 100) / 100,
-            distanceCharge: Math.round(quote * 0.2 * 100) / 100,
-            vat: Math.round(quote * 0.1 * 100) / 100
+            basePrice: Number((totalPrice * 0.7).toFixed(2)),
+            distanceCharge: Number((totalPrice * 0.2).toFixed(2)),
+            vat: Number((totalPrice * 0.1).toFixed(2))
           }
         }
       });
