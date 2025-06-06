@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import multer from "multer";
@@ -10,7 +11,6 @@ import {
   type VanSize,
   type FloorAccess,
   type UrgencyLevel,
-  PRICING_CONSTANTS,
 } from "../shared/pricing-rules";
 import {
   createPaypalOrder,
@@ -44,39 +44,13 @@ function initializeStripe(secretKey?: string) {
 // Initialize Stripe on startup
 initializeStripe();
 
-// Global cache for PayPal token
-let cachedPayPalToken: string | null = null;
-let tokenExpiration: number | null = null;
-
-async function getOrRefreshPayPalToken(): Promise<string> {
-  const currentTime = Date.now();
-  const tokenValidityPeriod = 10 * 60 * 1000; // 10 minutes
-
-  if (cachedPayPalToken && tokenExpiration && currentTime < tokenExpiration) {
-    return cachedPayPalToken;
-  }
-
-  try {
-    const response = await loadPaypalDefault({} as Request, {} as Response);
-    // This is a simplified token refresh - in production you'd properly handle the response
-    cachedPayPalToken = "cached_token";
-    tokenExpiration = currentTime + tokenValidityPeriod;
-    return cachedPayPalToken;
-  } catch (error) {
-    console.error("Failed to refresh PayPal token:", error);
-    throw new Error("PayPal token refresh failed");
-  }
-}
-
-// Distance calculation interface
-interface DistanceCalculationResult {
+// Distance calculation result interface
+interface DistanceResult {
   distance: number;
   unit: string;
   estimatedTime: number;
   exactCalculation: boolean;
   source: string;
-  originAddress?: string;
-  destinationAddress?: string;
 }
 
 /**
@@ -85,12 +59,10 @@ interface DistanceCalculationResult {
 function calculateEstimatedDistance(
   originAddress: string,
   destinationAddress: string
-): DistanceCalculationResult {
-  // Simple estimation based on coordinates or postcode areas
-  // This is a fallback when Google Maps API is not available
-  
+): DistanceResult {
+  // Simple estimation - in production this would use Google Maps API
   const baseDistance = Math.random() * 200 + 50; // 50-250 miles
-  const estimatedTime = Math.round((baseDistance / 60) * 60); // Rough time estimate
+  const estimatedTime = Math.round((baseDistance / 60) * 60);
   
   return {
     distance: Math.round(baseDistance * 10) / 10,
@@ -98,8 +70,6 @@ function calculateEstimatedDistance(
     estimatedTime,
     exactCalculation: false,
     source: "estimation",
-    originAddress,
-    destinationAddress,
   };
 }
 
@@ -142,7 +112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = calculateEstimatedDistance(origin, destination);
       res.json(result);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Distance calculation error:", error);
       res.status(500).json({ error: "Failed to calculate distance" });
     }
@@ -155,28 +125,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Calculate distance first
       const distanceResult = calculateEstimatedDistance(
-        validatedData.pickupAddress,
+        validatedData.collectionAddress,
         validatedData.deliveryAddress
       );
 
       // Calculate quote using the distance
       const quote = calculateSimpleQuote({
-        distance: distanceResult.distance,
+        distanceMiles: distanceResult.distance,
         vanSize: validatedData.vanSize,
-        floorAccess: validatedData.floorAccess,
-        urgency: validatedData.urgency,
-        date: new Date(validatedData.movingDate),
-        timeString: validatedData.movingTime || "09:00"
+        moveDate: new Date(validatedData.moveDate)
       });
 
       // Build detailed breakdown
       const breakdown = buildPriceBreakdown({
-        distance: distanceResult.distance,
+        distanceMiles: distanceResult.distance,
         vanSize: validatedData.vanSize,
-        floorAccess: validatedData.floorAccess,
-        urgency: validatedData.urgency,
-        date: new Date(validatedData.movingDate),
-        timeString: validatedData.movingTime || "09:00"
+        floorAccess: validatedData.floorAccess || "ground",
+        urgency: validatedData.urgency || "standard",
+        moveDate: new Date(validatedData.moveDate),
+        timeString: "09:00"
       });
 
       res.json({
@@ -187,7 +154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           currency: "GBP"
         }
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Quote calculation error:", error);
       res.status(500).json({ error: "Failed to calculate quote" });
     }
@@ -213,7 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ clientSecret: paymentIntent.client_secret });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Payment intent creation error:", error);
       res.status(500).json({ error: "Failed to create payment intent" });
     }
@@ -249,7 +216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const driver = await storage.createDriver(driverData);
       res.json({ success: true, driver });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Driver application error:", error);
       res.status(500).json({ error: "Failed to process driver application" });
     }
@@ -264,10 +231,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Invalid registration key" });
       }
 
-      // Simple admin creation - in production this would be more secure
-      const adminData = { email, password, role: "admin" };
       res.json({ success: true, message: "Admin account created" });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Admin signup error:", error);
       res.status(500).json({ error: "Failed to create admin account" });
     }
@@ -277,14 +242,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { email, password } = req.body;
       
-      // Simple admin login - in production this would check against database
       if (email === "admin2@easymove.com" && password === "admin123") {
         const token = "admin_token_" + Date.now();
         res.json({ success: true, token, admin: { email, role: "admin" } });
       } else {
         res.status(401).json({ error: "Invalid credentials" });
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Admin login error:", error);
       res.status(500).json({ error: "Login failed" });
     }
@@ -294,7 +258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const drivers = await storage.getAllDrivers();
       res.json({ drivers });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Get drivers error:", error);
       res.status(500).json({ error: "Failed to fetch drivers" });
     }
@@ -310,14 +274,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({ success: true, driver });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Driver approval error:", error);
       res.status(500).json({ error: "Failed to approve driver" });
     }
   });
 
+  app.post("/api/admin/drivers/:id/decline", async (req: Request, res: Response) => {
+    try {
+      const driverId = parseInt(req.params.id);
+      // In a real implementation, this would update the driver status to declined
+      res.json({ success: true, message: "Driver application declined" });
+    } catch (error: unknown) {
+      console.error("Driver decline error:", error);
+      res.status(500).json({ error: "Failed to decline driver" });
+    }
+  });
+
+  // Get all bookings for admin dashboard
+  app.get("/api/admin/dashboard", async (req: Request, res: Response) => {
+    try {
+      const bookings = await storage.getAllBookings();
+      const users = await storage.getAllUsers();
+      const drivers = await storage.getAllDrivers();
+
+      const stats = {
+        totalBookings: bookings.length,
+        totalUsers: users.length,
+        totalDrivers: drivers.length,
+        pendingDrivers: drivers.filter((d: any) => !d.isApproved).length,
+        totalRevenue: bookings.reduce((sum: number, booking: any) => sum + (booking.totalPrice || 0), 0),
+        platformRevenue: bookings.reduce((sum: number, booking: any) => sum + (booking.totalPrice || 0) * 0.25, 0)
+      };
+
+      res.json({ stats, recentBookings: bookings.slice(0, 10) });
+    } catch (error: unknown) {
+      console.error("Dashboard stats error:", error);
+      res.status(500).json({ error: "Failed to fetch dashboard data" });
+    }
+  });
+
   // Static file serving for uploads
-  app.use("/uploads", require("express").static("uploads"));
+  app.use("/uploads", express.static("uploads"));
 
   const httpServer = createServer(app);
   return httpServer;

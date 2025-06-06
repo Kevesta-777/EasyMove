@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import multer from "multer";
@@ -7,9 +8,6 @@ import { calculateQuoteSchema, insertDriverSchema } from "@shared/schema";
 import {
   calculateSimpleQuote,
   buildPriceBreakdown,
-  type VanSize,
-  type FloorAccess,
-  type UrgencyLevel,
 } from "../shared/pricing-rules";
 import {
   createPaypalOrder,
@@ -30,7 +28,7 @@ function initializeStripe(secretKey?: string) {
       return false;
     }
     
-    stripe = new Stripe(keyToUse, { apiVersion: "2024-12-18.acacia" });
+    stripe = new Stripe(keyToUse, { apiVersion: "2023-10-16" });
     stripeEnabled = true;
     console.log("Stripe initialized successfully");
     return true;
@@ -60,7 +58,7 @@ function calculateEstimatedDistance(
   destinationAddress: string
 ): DistanceResult {
   // Simple estimation - in production this would use Google Maps API
-  const baseDistance = Math.random() * 200 + 50; // 50-250 miles
+  const baseDistance = Math.random() * 200 + 50;
   const estimatedTime = Math.round((baseDistance / 60) * 60);
   
   return {
@@ -75,7 +73,7 @@ function calculateEstimatedDistance(
 // Configure multer for file uploads
 const upload = multer({
   dest: "uploads/",
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "application/pdf"];
     if (allowedTypes.includes(file.mimetype)) {
@@ -122,20 +120,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = calculateQuoteSchema.parse(req.body);
       
-      // Calculate distance first
       const distanceResult = calculateEstimatedDistance(
         validatedData.collectionAddress,
         validatedData.deliveryAddress
       );
 
-      // Calculate quote using the distance
       const quote = calculateSimpleQuote({
         distanceMiles: distanceResult.distance,
         vanSize: validatedData.vanSize,
         moveDate: new Date(validatedData.moveDate)
       });
 
-      // Build detailed breakdown
       const breakdown = buildPriceBreakdown({
         distanceMiles: distanceResult.distance,
         vanSize: validatedData.vanSize,
@@ -173,7 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount * 100), // Convert to pence
+        amount: Math.round(amount * 100),
         currency: "gbp",
         automatic_payment_methods: { enabled: true },
       });
@@ -279,18 +274,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/drivers/:id/decline", async (req: Request, res: Response) => {
-    try {
-      const driverId = parseInt(req.params.id);
-      // In a real implementation, this would update the driver status to declined
-      res.json({ success: true, message: "Driver application declined" });
-    } catch (error: unknown) {
-      console.error("Driver decline error:", error);
-      res.status(500).json({ error: "Failed to decline driver" });
-    }
-  });
-
-  // Get all bookings for admin dashboard
   app.get("/api/admin/dashboard", async (req: Request, res: Response) => {
     try {
       const bookings = await storage.getAllBookings();
@@ -313,7 +296,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Static file serving for uploads
   app.use("/uploads", express.static("uploads"));
 
   const httpServer = createServer(app);
