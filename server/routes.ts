@@ -51,23 +51,55 @@ interface DistanceResult {
 }
 
 /**
- * Calculate estimated distance between two addresses
+ * Calculate real distance using Google Distance Matrix API
  */
-function calculateEstimatedDistance(
+async function calculateRealDistance(
   originAddress: string,
   destinationAddress: string
-): DistanceResult {
-  // Simple estimation - in production this would use Google Maps API
-  const baseDistance = Math.random() * 200 + 50;
-  const estimatedTime = Math.round((baseDistance / 60) * 60);
+): Promise<DistanceResult> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   
-  return {
-    distance: Math.round(baseDistance * 10) / 10,
-    unit: "miles",
-    estimatedTime,
-    exactCalculation: false,
-    source: "estimation",
-  };
+  if (!apiKey) {
+    throw new Error("Google Maps API key not configured");
+  }
+
+  try {
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/distancematrix/json?` +
+      `origins=${encodeURIComponent(originAddress)}&` +
+      `destinations=${encodeURIComponent(destinationAddress)}&` +
+      `units=imperial&` +
+      `key=${apiKey}`
+    );
+
+    const data = await response.json();
+
+    if (data.status !== "OK" || !data.rows[0]?.elements[0]) {
+      throw new Error("Google Maps API returned invalid response");
+    }
+
+    const element = data.rows[0].elements[0];
+    
+    if (element.status !== "OK") {
+      throw new Error(`Distance calculation failed: ${element.status}`);
+    }
+
+    // Extract distance in miles and duration in minutes
+    const distanceText = element.distance.text;
+    const distanceMiles = parseFloat(distanceText.replace(/[^\d.]/g, ''));
+    const durationMinutes = Math.round(element.duration.value / 60);
+
+    return {
+      distance: Math.round(distanceMiles * 10) / 10,
+      unit: "miles",
+      estimatedTime: durationMinutes,
+      exactCalculation: true,
+      source: "google_maps",
+    };
+  } catch (error) {
+    console.error("Google Maps API error:", error);
+    throw error;
+  }
 }
 
 // Configure multer for file uploads
@@ -107,7 +139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Origin and destination are required" });
       }
 
-      const result = calculateEstimatedDistance(origin, destination);
+      const result = await calculateRealDistance(origin, destination);
       res.json(result);
     } catch (error: unknown) {
       console.error("Distance calculation error:", error);
@@ -120,7 +152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = calculateQuoteSchema.parse(req.body);
       
-      const distanceResult = calculateEstimatedDistance(
+      const distanceResult = await calculateRealDistance(
         validatedData.collectionAddress,
         validatedData.deliveryAddress
       );
