@@ -28,7 +28,7 @@ function initializeStripe(secretKey?: string) {
       return false;
     }
     
-    stripe = new Stripe(keyToUse, { apiVersion: "2023-10-16" });
+    stripe = new Stripe(keyToUse, { apiVersion: "2024-11-20.acacia" });
     stripeEnabled = true;
     console.log("Stripe initialized successfully");
     return true;
