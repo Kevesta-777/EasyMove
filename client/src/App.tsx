@@ -7,25 +7,13 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import DriverRegistration from "@/pages/DriverRegistration";
 import TermsAndConditions from "@/pages/TermsAndConditions";
-// Removed Calculator page (Price Quote page) to avoid confusion
-import Checkout from "@/pages/Checkout";
-import PayPalCheckout from "@/pages/PayPalCheckout";
-import StripeCheckout from "@/pages/StripeCheckout";
 import EmbeddedStripeCheckout from "@/pages/EmbeddedStripeCheckout";
-import PaymentTester from "@/pages/PaymentTester";
-import DetailedQuote from "@/pages/DetailedQuote";
-import TestDetailedQuotes from "@/pages/TestDetailedQuotes";
-import BookingTracker from "@/pages/BookingTracker";
+import BookingConfirmation from "@/pages/BookingConfirmation";
 import AdminLogin from "@/pages/admin/AdminLogin";
 import AdminSignup from "@/pages/admin/AdminSignup";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminBookings from "@/pages/admin/AdminBookings";
 import AdminDrivers from "@/pages/admin/AdminDrivers";
-
-import BookingConfirmation from "@/pages/BookingConfirmation";
-import StripeConfig from "@/pages/StripeConfig";
-import DistanceCalculator from "@/pages/DistanceCalculator";
-import CalculatorPage from "@/pages/Calculator";
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
 import { useState } from "react";
@@ -41,18 +29,8 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/driver-registration" component={DriverRegistration} />
       <Route path="/terms-and-conditions" component={TermsAndConditions} />
-      <Route path="/checkout" component={Checkout} />
+      <Route path="/checkout" component={EmbeddedStripeCheckout} />
       <Route path="/booking-confirmation" component={BookingConfirmation} />
-      <Route path="/stripe-config" component={StripeConfig} />
-      <Route path="/paypal-checkout" component={PayPalCheckout} />
-      <Route path="/stripe-checkout" component={StripeCheckout} />
-      <Route path="/embedded-checkout" component={EmbeddedStripeCheckout} />
-      <Route path="/distance-calculator" component={DistanceCalculator} />
-      <Route path="/calculator" component={CalculatorPage} />
-      <Route path="/payment-test" component={PaymentTester} />
-      <Route path="/quote" component={DetailedQuote} />
-      <Route path="/test-detailed-quotes" component={TestDetailedQuotes} />
-      <Route path="/booking-tracker" component={BookingTracker} />
       <Route path="/admin/login" component={AdminLogin} />
       <Route path="/admin/signup" component={AdminSignup} />
       <Route path="/admin/dashboard" component={AdminDashboard} />

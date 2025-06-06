@@ -134,10 +134,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const breakdown = buildPriceBreakdown({
         distanceMiles: distanceResult.distance,
         vanSize: validatedData.vanSize,
+        estimatedHours: 2,
+        numHelpers: validatedData.helpers || 0,
         floorAccess: validatedData.floorAccess || "ground",
-        urgency: validatedData.urgency || "standard",
+        liftAvailable: false,
         moveDate: new Date(validatedData.moveDate),
-        timeString: "09:00"
+        urgency: validatedData.urgency || "standard"
       });
 
       res.json({
