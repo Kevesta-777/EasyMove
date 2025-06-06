@@ -8,9 +8,11 @@ import { updateUserAgent } from "@paypal/paypal-server-sdk/dist/types/core";
 export type VanSize = "small" | "medium" | "large" | "luton";
 export type FloorAccess =
   | "ground"
-  | "firstFloor"
-  | "secondFloor"
-  | "thirdFloorPlus";
+  | "first"
+  | "second"
+  | "third"
+  | "fourth"
+  | "above_fourth";
 export type UrgencyLevel = "standard" | "priority" | "express";
 
 // Base pricing constants - updated based on new requirements

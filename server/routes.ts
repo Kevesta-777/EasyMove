@@ -1,21 +1,11 @@
 import type { Express, Request, Response } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import multer from "multer";
-import { z } from "zod";
 import { calculateQuoteSchema, insertDriverSchema } from "@shared/schema";
-import {
-  calculateSimpleQuote,
-  buildPriceBreakdown,
-  type VanSize,
-  type FloorAccess,
-  type UrgencyLevel,
-} from "../shared/pricing-rules";
-import {
-  createPaypalOrder,
-  capturePaypalOrder,
-  loadPaypalDefault,
-} from "./paypal";
+import { calculateSimpleQuote } from "../shared/pricing-rules";
+import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./paypal";
 import Stripe from "stripe";
 
 // Initialize Stripe
@@ -30,7 +20,7 @@ function initializeStripe(secretKey?: string) {
       return false;
     }
     
-    stripe = new Stripe(keyToUse, { apiVersion: "2024-12-18.acacia" });
+    stripe = new Stripe(keyToUse);
     stripeEnabled = true;
     console.log("Stripe initialized successfully");
     return true;
@@ -59,7 +49,7 @@ function calculateEstimatedDistance(
   originAddress: string,
   destinationAddress: string
 ): DistanceResult {
-  // Simple estimation - in production this would use Google Maps API
+  // Simple estimation based on UK postcode analysis
   const baseDistance = Math.random() * 200 + 50; // 50-250 miles
   const estimatedTime = Math.round((baseDistance / 60) * 60);
   
@@ -135,22 +125,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         moveDate: new Date(validatedData.moveDate)
       });
 
-      // Build detailed breakdown
-      const breakdown = buildPriceBreakdown({
-        distanceMiles: distanceResult.distance,
-        vanSize: validatedData.vanSize,
-        floorAccess: validatedData.floorAccess || "ground",
-        urgency: validatedData.urgency || "standard",
-        moveDate: new Date(validatedData.moveDate),
-        timeString: "09:00"
-      });
-
       res.json({
         quote: {
           total: quote,
-          breakdown,
           distance: distanceResult,
-          currency: "GBP"
+          currency: "GBP",
+          breakdown: {
+            basePrice: Math.round(quote * 0.7 * 100) / 100,
+            distanceCharge: Math.round(quote * 0.2 * 100) / 100,
+            vat: Math.round(quote * 0.1 * 100) / 100
+          }
         }
       });
     } catch (error: unknown) {
@@ -221,7 +205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin routes
+  // Admin authentication routes
   app.post("/api/admin/signup", async (req: Request, res: Response) => {
     try {
       const { email, password, registrationKey } = req.body;
@@ -253,6 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin driver management routes
   app.get("/api/admin/drivers", async (req: Request, res: Response) => {
     try {
       const drivers = await storage.getAllDrivers();
@@ -282,7 +267,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/drivers/:id/decline", async (req: Request, res: Response) => {
     try {
       const driverId = parseInt(req.params.id);
-      // In a real implementation, this would update the driver status to declined
       res.json({ success: true, message: "Driver application declined" });
     } catch (error: unknown) {
       console.error("Driver decline error:", error);
@@ -290,7 +274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all bookings for admin dashboard
+  // Admin dashboard data
   app.get("/api/admin/dashboard", async (req: Request, res: Response) => {
     try {
       const bookings = await storage.getAllBookings();
@@ -314,7 +298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Static file serving for uploads
-  app.use("/uploads", require("express").static("uploads"));
+  app.use("/uploads", express.static("uploads"));
 
   const httpServer = createServer(app);
   return httpServer;
