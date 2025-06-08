@@ -36,30 +36,31 @@ export default function AdminLogin() {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('Login response:', data);
         
-        // Store admin session
+        // Store admin session - server returns 'admin' not 'user'
         localStorage.setItem('adminAuth', JSON.stringify({
           token: data.token,
-          user: data.user,
-          role: data.role,
+          user: data.admin,
+          role: data.admin?.role,
           loginTime: new Date().toISOString()
         }));
 
         toast({
           title: "Login Successful",
-          description: `Welcome back, ${data.user.name}`,
+          description: `Welcome back, ${data.admin?.username || data.admin?.email}`,
           variant: "default",
         });
 
         // Redirect to admin dashboard
         setLocation('/admin/dashboard');
       } else {
-        const errorData = await response.json();
-        setError(errorData.message || 'Invalid credentials');
+        const errorData = await response.json().catch(() => ({ error: 'Invalid credentials' }));
+        setError(errorData.error || errorData.message || 'Invalid credentials');
       }
     } catch (error) {
       console.error('Login error:', error);
-      setError('Failed to connect to server. Please try again.');
+      setError('Connection failed. Please check your credentials and try again.');
     } finally {
       setLoading(false);
     }
