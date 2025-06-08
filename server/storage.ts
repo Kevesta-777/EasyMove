@@ -84,6 +84,10 @@ export class DatabaseStorage implements IStorage {
       return user;
     } catch (error) {
       console.error('Error fetching user by email:', error);
+      // For connection errors, throw to allow retry logic
+      if (error instanceof Error && (error.message.includes('connection') || error.message.includes('pool'))) {
+        throw error;
+      }
       return undefined;
     }
   }

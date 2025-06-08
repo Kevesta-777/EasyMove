@@ -303,8 +303,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { email, password } = req.body;
       console.log('Admin login attempt:', { email, passwordProvided: !!password });
 
-      // Authenticate using database
-      const admin = await storage.getUserByEmail(email);
+      // Retry mechanism for database connection issues
+      let admin;
+      let retries = 3;
+      
+      while (retries > 0) {
+        try {
+          admin = await storage.getUserByEmail(email);
+          break; // Success, exit retry loop
+        } catch (dbError: any) {
+          console.log(`Database retry attempt ${4 - retries}, retries left: ${retries - 1}`);
+          retries--;
+          if (retries === 0) {
+            throw dbError; // Final attempt failed
+          }
+          // Wait 1 second before retry
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
       console.log('Admin found:', admin ? { id: admin.id, email: admin.email, role: admin.role } : 'No admin found');
       
       if (admin && admin.password === password && admin.role === "admin") {
@@ -325,7 +342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error: unknown) {
       console.error("Admin login error:", error);
-      res.status(500).json({ error: "Login failed" });
+      res.status(500).json({ error: "Login failed due to database connection issues" });
     }
   });
 
