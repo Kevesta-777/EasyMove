@@ -4,7 +4,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import multer from "multer";
 import { z } from "zod";
-import { calculateQuoteSchema, insertDriverSchema } from "@shared/schema";
+import { calculateQuoteSchema, insertDriverSchema } from "../shared/schema";
 import {
   calculateSimpleQuote,
   buildPriceBreakdown,

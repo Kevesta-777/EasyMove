@@ -17,7 +17,7 @@ import {
   pricingHistory,
   type PricingHistory,
   type InsertPricingHistory
-} from "@shared/schema";
+} from "../shared/schema";
 import { db } from "./db";
 import { eq, like, and, desc } from "drizzle-orm";
 
