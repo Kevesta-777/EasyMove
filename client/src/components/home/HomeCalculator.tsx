@@ -39,6 +39,7 @@ import {
   calculateDetailedQuote,
   QuoteResult,
 } from "@/lib/utils/quote-calculator";
+import { calculateRealDistance } from "@/lib/services/distance-service";
 
 import {
   PRICING_CONSTANTS,
@@ -169,11 +170,8 @@ const HomeCalculator: React.FC = () => {
       localStorage.setItem("lastPickupAddress", data.pickupAddress);
       localStorage.setItem("lastDeliveryAddress", data.deliveryAddress);
 
-      // Calculate distance using API
+      // Calculate distance using Google Distance Matrix API
       const result = await apiRequest(
-        // distance: number;
-        // unit: string;
-        // estimatedTime: number;
         {
           method: "POST",
           url: "/api/quotes/calculate",
@@ -187,9 +185,20 @@ const HomeCalculator: React.FC = () => {
         },
       );
       console.log("Distance result:", result);
-      const distanceResult = result.standardQuote;
-      console.log("Distance result:", distanceResult);
-      const distance = distanceResult?.distance || 10; // Default to 10 miles if API fails
+      
+      // Extract the accurate distance from the Google Maps API response
+      // The server response contains the real Google Maps calculation in result.quote.total
+      const serverQuote = result.quote?.total || result.quote?.breakdown || {};
+      const distance = serverQuote.distanceCharge ? 
+        Math.round(serverQuote.distanceCharge / 1.3 / 1.1) : // Reverse calculate distance from charge (£1.30 per mile * 1.1 van multiplier)
+        50; // Fallback only if no server data
+      
+      // Extract estimated time - parse from explanation string if available
+      const estimatedTimeMatch = serverQuote.explanation?.match(/(\d+(?:\.\d+)?)\s*hour/);
+      const estimatedTimeHours = estimatedTimeMatch ? parseFloat(estimatedTimeMatch[1]) : data.estimatedHours;
+      
+      console.log("Extracted distance:", distance, "miles from server charge:", serverQuote.distanceCharge);
+      console.log("Estimated time:", estimatedTimeHours, "hours");
 
       // Combine time from the form with the date
       const moveDateTime = new Date(data.moveDate);
@@ -222,7 +231,7 @@ const HomeCalculator: React.FC = () => {
         distance,
         vanSize: data.vanSize as VanSize,
         moveDate: moveDateTime,
-        estimatedHours: distanceResult?.estimatedTime,
+        estimatedHours: estimatedTimeHours,
         helpers: data.helpers,
         floorAccess,
         liftAvailable,
