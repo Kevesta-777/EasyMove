@@ -301,12 +301,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/login", async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body;
+      console.log('Admin login attempt:', { email, passwordProvided: !!password });
 
       // Authenticate using database
       const admin = await storage.getUserByEmail(email);
+      console.log('Admin found:', admin ? { id: admin.id, email: admin.email, role: admin.role } : 'No admin found');
       
       if (admin && admin.password === password && admin.role === "admin") {
         const token = "admin_token_" + Date.now();
+        console.log('Admin login successful');
         res.json({ 
           success: true, 
           token, 
