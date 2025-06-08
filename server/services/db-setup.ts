@@ -1,6 +1,6 @@
 import { db, pool } from "../db";
 import { drizzle } from "drizzle-orm/neon-serverless";
-import * as schema from "@shared/schema";
+import * as schema from "../../shared/schema";
 import { initializeDefaultPricingModel } from "./pricing-init";
 import { sql } from "drizzle-orm";
 
