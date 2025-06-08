@@ -1,8 +1,24 @@
 import { Link } from "wouter";
-import { 
-  X, ChevronDown, ChevronRight, Phone, Mail, Home, Info, Users, MapPin, 
-  HelpCircle, Calculator, CreditCard, TruckIcon, Clock, Car, PieChart, 
-  Map, Star, Truck
+import {
+  X,
+  ChevronDown,
+  ChevronRight,
+  Phone,
+  Mail,
+  Home,
+  Info,
+  Users,
+  MapPin,
+  HelpCircle,
+  Calculator,
+  CreditCard,
+  TruckIcon,
+  Clock,
+  Car,
+  PieChart,
+  Map,
+  Star,
+  Truck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -13,7 +29,7 @@ interface MobileMenuProps {
 
 export default function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  
+
   // Prevent scrolling when menu is open
   useEffect(() => {
     if (isOpen) {
@@ -71,23 +87,23 @@ export default function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
         <nav className="p-4">
           {/* Features menu - Main hamburger menu item */}
           <div className="mb-2 border-b border-gray-100 pb-2">
-            <button 
-              className={`flex items-center justify-between w-full p-3 text-lg font-medium ${activeMenu === 'features' ? 'text-primary bg-blue-50' : 'text-gray-800'} hover:bg-blue-50 rounded-lg transition-colors`}
-              onClick={() => toggleMenu('features')}
+            <button
+              className={`flex items-center justify-between w-full p-3 text-lg font-medium ${activeMenu === "features" ? "text-primary bg-blue-50" : "text-gray-800"} hover:bg-blue-50 rounded-lg transition-colors`}
+              onClick={() => toggleMenu("features")}
             >
               <span className="flex items-center">
                 <Truck className="w-5 h-5 mr-3 text-primary" />
                 Features
               </span>
-              {activeMenu === 'features' ? (
+              {activeMenu === "features" ? (
                 <ChevronDown className="w-5 h-5 text-primary" />
               ) : (
                 <ChevronRight className="w-5 h-5 text-gray-500" />
               )}
             </button>
-            
+
             {/* Features submenu - Consolidated */}
-            {activeMenu === 'features' && (
+            {activeMenu === "features" && (
               <div className="ml-4 pl-4 mt-1 border-l-2 border-blue-100 space-y-1">
                 <a
                   href="#how-it-works"
@@ -130,13 +146,13 @@ export default function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
                   FAQ
                 </a>
                 <Link href="/calculator">
-                  <span
+                  {/* <span
                     className="flex items-center px-3 py-2.5 text-gray-700 hover:text-primary rounded-lg hover:bg-gray-50 transition-colors"
                     onClick={handleLinkClick}
                   >
                     <Calculator className="w-4 h-4 mr-3 text-primary" />
                     Price Calculator
-                  </span>
+                  </span> */}
                 </Link>
                 <Link href="/distance-calculator">
                   <span
@@ -150,22 +166,28 @@ export default function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
               </div>
             )}
           </div>
-          
+
           {/* Contact information */}
           <div className="mt-4 px-3 py-4 bg-blue-50 rounded-lg">
             <h3 className="font-medium text-gray-900 mb-2">Contact Us</h3>
             <div className="space-y-2 text-sm">
-              <a href="tel:+447477573794" className="flex items-center text-gray-700">
+              <a
+                href="tel:+447477573794"
+                className="flex items-center text-gray-700"
+              >
                 <Phone className="w-4 h-4 mr-2 text-primary" />
                 07477 573794
               </a>
-              <a href="mailto:support@easymovevan.co.uk" className="flex items-center text-gray-700">
+              <a
+                href="mailto:support@easymovevan.co.uk"
+                className="flex items-center text-gray-700"
+              >
                 <Mail className="w-4 h-4 mr-2 text-primary" />
                 support@easymovevan.co.uk
               </a>
             </div>
           </div>
-          
+
           {/* Action buttons */}
           <div className="mt-6 space-y-3">
             <Link href="/driver-registration">

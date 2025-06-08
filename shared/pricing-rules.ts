@@ -8,18 +8,17 @@ import { updateUserAgent } from "@paypal/paypal-server-sdk/dist/types/core";
 export type VanSize = "small" | "medium" | "large" | "luton";
 export type FloorAccess =
   | "ground"
-  | "first"
-  | "second"
-  | "third"
-  | "fourth"
-  | "above_fourth";
+  | "firstFloor"
+  | "secondFloor"
+  | "thirdFloorPlus";
 export type UrgencyLevel = "standard" | "priority" | "express";
 
 // Base pricing constants - updated based on new requirements
 export const PRICING_CONSTANTS = {
   // Base fare and distance-based pricing
   BASE_FARE: 15, // £15 base fare for all jobs
-  BASE_RATE_PER_MILE: 1.30, // £1.30 per mile as specified
+  BASE_RATE_PER_MILE_MIN: 1.75, // £1.75 per mile (matches COST_PER_MILE)
+  BASE_RATE_PER_MILE_MAX: 2.0, // £2.00 per mile (maximum)
   MINIMUM_DISTANCE_CHARGE: 5, // Minimum distance charge in miles
 
   // Van capacities and details
@@ -63,11 +62,9 @@ export const PRICING_CONSTANTS = {
   // Access charges
   FLOOR_ACCESS_FEES: {
     ground: 0,
-    first: 10, // £10 for first floor
-    second: 20, // £20 for second floor
-    third: 30, // £30 for third floor
-    fourth: 35, // £35 for fourth floor
-    above_fourth: 40, // £40 for above fourth floor
+    firstFloor: 10, // £10 for first floor
+    secondFloor: 20, // £20 for second floor
+    thirdFloorPlus: 30, // £30 for third floor or higher
   },
   LIFT_DISCOUNT: 0.5, // 50% discount if lift is available
 
@@ -93,14 +90,14 @@ export const PRICING_CONSTANTS = {
     large: 28, // large van
     luton: 24, // luton van - worst fuel efficiency
   },
-  RETURN_JOURNEY_FACTOR: 0.35, // Return journey at 35% of outbound as specified
+  RETURN_JOURNEY_FACTOR: 0.3, // Return journey at 30% of outbound
 
-  // Van size multipliers as specified
+  // Van size multipliers - updated according to requirements
   VAN_SIZE_MULTIPLIERS: {
-    small: 1.0, // Small van - Base rate
-    medium: 1.1, // Medium van - 1.1 factor
-    large: 1.2, // Long van - 1.2 factor
-    luton: 1.3, // Luton van - 1.3 factor
+    small: 1.0, // SWB - Base rate (Small Wheel Base)
+    medium: 1.1, // MWB - 20% more than small (Medium Wheel Base)
+    large: 1.2, // LWB - 40% more than small (Long Wheel Base)
+    luton: 1.3, // Luton - 60% more than small
   },
 
   // Loading/unloading times (in hours)
@@ -132,22 +129,50 @@ export function calculateDistanceCharge(
   vanSize: VanSize = "medium",
   isUrban: boolean = false,
 ): number {
+  // Start with the base fare
+  let charge = PRICING_CONSTANTS.BASE_FARE;
+
   // Apply the base rate per mile with a minimum distance
   const effectiveDistance = Math.max(
     distanceMiles,
     PRICING_CONSTANTS.MINIMUM_DISTANCE_CHARGE,
   );
 
-  // Use the specified £1.30 per mile rate
-  const perMileRate = PRICING_CONSTANTS.BASE_RATE_PER_MILE;
-  
-  // Apply van size multiplier to the rate
+  // Determine per-mile rate based on location (urban vs rural) and van size
+  let perMileRate;
   const sizeFactor = calculateVanSizeMultiplier(vanSize);
-  const adjustedPerMileRate = perMileRate * sizeFactor;
 
-  // Calculate distance charge
-  const charge = effectiveDistance * adjustedPerMileRate;
-  
+  // Urban areas are charged more due to traffic, parking challenges, etc.
+  if (isUrban) {
+    perMileRate = PRICING_CONSTANTS.BASE_RATE_PER_MILE_MAX; // £2.00 per mile for urban areas
+  } else {
+    // For rural or standard areas, use lower rate but adjust based on distance
+    // Shorter distances have higher per-mile costs
+    const distanceFactor = Math.min(1, 20 / effectiveDistance);
+    perMileRate =
+      PRICING_CONSTANTS.BASE_RATE_PER_MILE_MIN +
+      (PRICING_CONSTANTS.BASE_RATE_PER_MILE_MAX -
+        PRICING_CONSTANTS.BASE_RATE_PER_MILE_MIN) *
+        distanceFactor;
+  }
+
+  // Calculate fuel cost per mile to incorporate into the per-mile rate
+  // MPG and fuel calculation integrated directly into distance charge
+  const mpg =
+    PRICING_CONSTANTS.AVERAGE_MPG[vanSize] ||
+    PRICING_CONSTANTS.AVERAGE_MPG.medium;
+  const litresPerGallon = 4.54609; // UK gallon
+  const fuelCostPerMile =
+    (1 / mpg) * PRICING_CONSTANTS.FUEL_PRICE_PER_LITRE * litresPerGallon;
+
+  // Add fuel cost to the per-mile rate
+  const totalPerMileRate = perMileRate + fuelCostPerMile;
+
+  // Apply van size multiplier to the total per-mile rate
+  const adjustedPerMileRate = totalPerMileRate * sizeFactor;
+  // Add the distance charge (now includes fuel)
+  // charge += effectiveDistance * adjustedPerMileRate;
+  charge = effectiveDistance * 1.2;
   return charge;
 }
 
@@ -312,8 +337,8 @@ export function calculateReturnJourneyCost(
   );
   const sizeFactor = calculateVanSizeMultiplier(vanSize);
 
-  // Use the base per-mile rate for return journey calculation
-  const returnRate = PRICING_CONSTANTS.BASE_RATE_PER_MILE;
+  // Use the lowest per-mile rate for return journey (more efficient, less traffic)
+  const returnRate = PRICING_CONSTANTS.BASE_RATE_PER_MILE_MIN;
 
   // Apply size factor to the rate
   const adjustedRate = returnRate * sizeFactor;
@@ -539,9 +564,8 @@ export function buildPriceBreakdown(params: {
     distanceCharge,
   );
 
-  // Calculate additional fees with proper defaults
-  const validEstimatedHours = estimatedHours || estimateTravelTime(distanceMiles, moveDate);
-  const helpersFee = calculateHelperFee(numHelpers || 0, validEstimatedHours);
+  // Calculate additional fees
+  const helpersFee = calculateHelperFee(numHelpers, estimatedHours);
   const floorAccessFee = calculateFloorAccessFee(floorAccess, liftAvailable);
   const fuelCost = calculateFuelCost(distanceMiles, vanSize);
   const congestionCharge = inLondon ? PRICING_CONSTANTS.CONGESTION_CHARGE : 0;
@@ -618,7 +642,7 @@ export function buildPriceBreakdown(params: {
   //   vanSize,
   //   floorAccess !== "ground" && !liftAvailable,
   // );
-  const totalTime = validEstimatedHours;
+  const totalTime = estimatedHours;
   const estimatedTime = formatDuration(totalTime);
   return {
     totalPrice,

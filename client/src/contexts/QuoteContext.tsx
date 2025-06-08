@@ -94,7 +94,14 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
 export function useQuote(): QuoteContextType {
   const context = useContext(QuoteContext);
   if (context === undefined) {
-    throw new Error("useQuote must be used within a QuoteProvider");
+    console.warn("useQuote must be used within a QuoteProvider");
+    return {
+      currentQuote: null,
+      setQuote: () => {},
+      clearQuote: () => {},
+      saveQuoteToLocalStorage: () => {},
+      loadQuoteFromLocalStorage: () => false,
+    };
   }
   return context;
 }

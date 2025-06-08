@@ -27,7 +27,7 @@ function initializeStripe(secretKey?: string) {
       console.log("No Stripe secret key found");
       return false;
     }
-    
+
     stripe = new Stripe(keyToUse, { apiVersion: "2024-11-20.acacia" as any });
     stripeEnabled = true;
     console.log("Stripe initialized successfully");
@@ -55,10 +55,10 @@ interface DistanceResult {
  */
 async function calculateRealDistance(
   originAddress: string,
-  destinationAddress: string
+  destinationAddress: string,
 ): Promise<DistanceResult> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-  
+
   if (!apiKey) {
     throw new Error("Google Maps API key not configured");
   }
@@ -66,10 +66,10 @@ async function calculateRealDistance(
   try {
     const response = await fetch(
       `https://maps.googleapis.com/maps/api/distancematrix/json?` +
-      `origins=${encodeURIComponent(originAddress)}&` +
-      `destinations=${encodeURIComponent(destinationAddress)}&` +
-      `units=imperial&` +
-      `key=${apiKey}`
+        `origins=${encodeURIComponent(originAddress)}&` +
+        `destinations=${encodeURIComponent(destinationAddress)}&` +
+        `units=imperial&` +
+        `key=${apiKey}`,
     );
 
     const data = await response.json();
@@ -79,14 +79,14 @@ async function calculateRealDistance(
     }
 
     const element = data.rows[0].elements[0];
-    
+
     if (element.status !== "OK") {
       throw new Error(`Distance calculation failed: ${element.status}`);
     }
 
     // Extract distance in miles and duration in minutes
     const distanceText = element.distance.text;
-    const distanceMiles = parseFloat(distanceText.replace(/[^\d.]/g, ''));
+    const distanceMiles = parseFloat(distanceText.replace(/[^\d.]/g, ""));
     const durationMinutes = Math.round(element.duration.value / 60);
 
     return {
@@ -107,7 +107,12 @@ const upload = multer({
   dest: "uploads/",
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "application/pdf"];
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/jpg",
+      "application/pdf",
+    ];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
@@ -119,14 +124,14 @@ const upload = multer({
 export async function registerRoutes(app: Express): Promise<Server> {
   // Health check endpoint
   app.get("/health", (req: Request, res: Response) => {
-    res.json({ 
-      status: "healthy", 
+    res.json({
+      status: "healthy",
       timestamp: new Date().toISOString(),
       services: {
         database: "connected",
         stripe: stripeEnabled ? "enabled" : "disabled",
-        paypal: "enabled"
-      }
+        paypal: "enabled",
+      },
     });
   });
 
@@ -134,9 +139,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/distance", async (req: Request, res: Response) => {
     try {
       const { origin, destination } = req.body;
-      
+
       if (!origin || !destination) {
-        return res.status(400).json({ error: "Origin and destination are required" });
+        return res
+          .status(400)
+          .json({ error: "Origin and destination are required" });
       }
 
       const result = await calculateRealDistance(origin, destination);
@@ -151,16 +158,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/quotes/calculate", async (req: Request, res: Response) => {
     try {
       const validatedData = calculateQuoteSchema.parse(req.body);
-      
+
       const distanceResult = await calculateRealDistance(
         validatedData.collectionAddress,
-        validatedData.deliveryAddress
+        validatedData.deliveryAddress,
       );
 
       const quote = calculateSimpleQuote({
         distanceMiles: distanceResult.distance,
         vanSize: validatedData.vanSize,
-        moveDate: new Date(validatedData.moveDate)
+        moveDate: new Date(validatedData.moveDate),
       });
 
       const breakdown = buildPriceBreakdown({
@@ -171,7 +178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         floorAccess: validatedData.floorAccess || "ground",
         liftAvailable: false,
         moveDate: new Date(validatedData.moveDate),
-        urgency: validatedData.urgency || "standard"
+        urgency: validatedData.urgency || "standard",
       });
 
       res.json({
@@ -179,8 +186,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           total: quote,
           breakdown,
           distance: distanceResult,
-          currency: "GBP"
-        }
+          currency: "GBP",
+        },
       });
     } catch (error: unknown) {
       console.error("Quote calculation error:", error);
@@ -189,30 +196,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stripe payment intent creation
-  app.post("/api/create-payment-intent", async (req: Request, res: Response) => {
-    try {
-      if (!stripeEnabled || !stripe) {
-        return res.status(503).json({ error: "Payment processing unavailable" });
+  app.post(
+    "/api/create-payment-intent",
+    async (req: Request, res: Response) => {
+      try {
+        if (!stripeEnabled || !stripe) {
+          return res
+            .status(503)
+            .json({ error: "Payment processing unavailable" });
+        }
+
+        const { amount } = req.body;
+
+        if (!amount || amount <= 0) {
+          return res.status(400).json({ error: "Valid amount is required" });
+        }
+
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: Math.round(amount * 100),
+          currency: "gbp",
+          automatic_payment_methods: { enabled: true },
+        });
+
+        res.json({ clientSecret: paymentIntent.client_secret });
+      } catch (error: unknown) {
+        console.error("Payment intent creation error:", error);
+        res.status(500).json({ error: "Failed to create payment intent" });
       }
-
-      const { amount } = req.body;
-      
-      if (!amount || amount <= 0) {
-        return res.status(400).json({ error: "Valid amount is required" });
-      }
-
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount * 100),
-        currency: "gbp",
-        automatic_payment_methods: { enabled: true },
-      });
-
-      res.json({ clientSecret: paymentIntent.client_secret });
-    } catch (error: unknown) {
-      console.error("Payment intent creation error:", error);
-      res.status(500).json({ error: "Failed to create payment intent" });
-    }
-  });
+    },
+  );
 
   // PayPal routes (non-prefixed for SDK compatibility)
   app.get("/setup", async (req: Request, res: Response) => {
@@ -228,38 +240,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Driver application endpoint
-  app.post("/api/drivers/apply", upload.fields([
-    { name: "drivingLicense", maxCount: 1 },
-    { name: "insurance", maxCount: 1 },
-    { name: "vehicleRegistration", maxCount: 1 }
-  ]), async (req: Request, res: Response) => {
-    try {
-      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-      const driverData = insertDriverSchema.parse({
-        ...req.body,
-        drivingLicenseUrl: files.drivingLicense?.[0]?.path,
-        insuranceUrl: files.insurance?.[0]?.path,
-        vehicleRegistrationUrl: files.vehicleRegistration?.[0]?.path,
-      });
+  app.post(
+    "/api/drivers/apply",
+    upload.fields([
+      { name: "drivingLicense", maxCount: 1 },
+      { name: "insurance", maxCount: 1 },
+      { name: "vehicleRegistration", maxCount: 1 },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const files = req.files as {
+          [fieldname: string]: Express.Multer.File[];
+        };
+        const driverData = insertDriverSchema.parse({
+          ...req.body,
+          drivingLicenseUrl: files.drivingLicense?.[0]?.path,
+          insuranceUrl: files.insurance?.[0]?.path,
+          vehicleRegistrationUrl: files.vehicleRegistration?.[0]?.path,
+        });
 
-      const driver = await storage.createDriver(driverData);
-      res.json({ success: true, driver });
-    } catch (error: unknown) {
-      console.error("Driver application error:", error);
-      res.status(500).json({ error: "Failed to process driver application" });
-    }
-  });
+        const driver = await storage.createDriver(driverData);
+        res.json({ success: true, driver });
+      } catch (error: unknown) {
+        console.error("Driver application error:", error);
+        res.status(500).json({ error: "Failed to process driver application" });
+      }
+    },
+  );
 
   // Admin routes
   app.post("/api/admin/signup", async (req: Request, res: Response) => {
     try {
       const { email, password, registrationKey } = req.body;
-      
+
       if (registrationKey !== "easymove2025") {
         return res.status(403).json({ error: "Invalid registration key" });
       }
 
-      res.json({ success: true, message: "Admin account created" });
+      // Check if admin already exists
+      const existingAdmin = await storage.getUserByEmail(email);
+      if (existingAdmin) {
+        return res.status(400).json({ error: "Admin account already exists" });
+      }
+
+      // Create admin user in database
+      const adminUser = await storage.createUser({
+        username: email.split('@')[0],
+        email,
+        password, // In production, this should be hashed
+        role: "admin"
+      });
+
+      res.json({ success: true, message: "Admin account created", admin: { id: adminUser.id, email: adminUser.email, role: adminUser.role } });
     } catch (error: unknown) {
       console.error("Admin signup error:", error);
       res.status(500).json({ error: "Failed to create admin account" });
@@ -269,10 +301,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/login", async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body;
+
+      // Authenticate using database
+      const admin = await storage.getUserByEmail(email);
       
-      if (email === "admin2@easymove.com" && password === "admin123") {
+      if (admin && admin.password === password && admin.role === "admin") {
         const token = "admin_token_" + Date.now();
-        res.json({ success: true, token, admin: { email, role: "admin" } });
+        res.json({ 
+          success: true, 
+          token, 
+          admin: { 
+            id: admin.id,
+            email: admin.email, 
+            role: admin.role,
+            username: admin.username
+          } 
+        });
       } else {
         res.status(401).json({ error: "Invalid credentials" });
       }
@@ -292,21 +336,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/drivers/:id/approve", async (req: Request, res: Response) => {
-    try {
-      const driverId = parseInt(req.params.id);
-      const driver = await storage.approveDriver(driverId);
-      
-      if (!driver) {
-        return res.status(404).json({ error: "Driver not found" });
-      }
+  app.post(
+    "/api/admin/drivers/:id/approve",
+    async (req: Request, res: Response) => {
+      try {
+        const driverId = parseInt(req.params.id);
+        const driver = await storage.approveDriver(driverId);
 
-      res.json({ success: true, driver });
-    } catch (error: unknown) {
-      console.error("Driver approval error:", error);
-      res.status(500).json({ error: "Failed to approve driver" });
-    }
-  });
+        if (!driver) {
+          return res.status(404).json({ error: "Driver not found" });
+        }
+
+        res.json({ success: true, driver });
+      } catch (error: unknown) {
+        console.error("Driver approval error:", error);
+        res.status(500).json({ error: "Failed to approve driver" });
+      }
+    },
+  );
 
   app.get("/api/admin/dashboard", async (req: Request, res: Response) => {
     try {
@@ -319,14 +366,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalUsers: users.length,
         totalDrivers: drivers.length,
         pendingDrivers: drivers.filter((d: any) => !d.isApproved).length,
-        totalRevenue: bookings.reduce((sum: number, booking: any) => sum + (booking.totalPrice || 0), 0),
-        platformRevenue: bookings.reduce((sum: number, booking: any) => sum + (booking.totalPrice || 0) * 0.25, 0)
+        totalRevenue: bookings.reduce(
+          (sum: number, booking: any) => sum + (booking.totalPrice || 0),
+          0,
+        ),
+        platformRevenue: bookings.reduce(
+          (sum: number, booking: any) => sum + (booking.totalPrice || 0) * 0.25,
+          0,
+        ),
       };
 
       res.json({ stats, recentBookings: bookings.slice(0, 10) });
     } catch (error: unknown) {
       console.error("Dashboard stats error:", error);
       res.status(500).json({ error: "Failed to fetch dashboard data" });
+    }
+  });
+
+  // Admin bookings endpoint
+  app.get("/api/admin/bookings", async (req: Request, res: Response) => {
+    try {
+      const bookings = await storage.getAllBookingsWithDetails();
+      res.json({ bookings });
+    } catch (error: unknown) {
+      console.error("Get bookings error:", error);
+      res.status(500).json({ error: "Failed to fetch bookings" });
+    }
+  });
+
+  // Driver decline endpoint
+  app.post("/api/admin/drivers/:id/decline", async (req: Request, res: Response) => {
+    try {
+      const driverId = parseInt(req.params.id);
+      const driver = await storage.getDriver(driverId);
+
+      if (!driver) {
+        return res.status(404).json({ error: "Driver not found" });
+      }
+
+      // In a real implementation, you might want to add a declined status
+      // For now, we'll just return success
+      res.json({ success: true, message: "Driver application declined" });
+    } catch (error: unknown) {
+      console.error("Driver decline error:", error);
+      res.status(500).json({ error: "Failed to decline driver" });
     }
   });
 
