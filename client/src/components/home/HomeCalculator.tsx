@@ -186,18 +186,29 @@ const HomeCalculator: React.FC = () => {
       );
       console.log("Distance result:", result);
       
-      // Extract the accurate distance from the Google Maps API response
-      // The server response contains the real Google Maps calculation in result.quote.total
+      // Use the accurate Google Maps distance from the server response
+      // The server already calculated the correct distance using Google Distance Matrix API
       const serverQuote = result.quote?.total || result.quote?.breakdown || {};
-      const distance = serverQuote.distanceCharge ? 
-        Math.round(serverQuote.distanceCharge / 1.3 / 1.1) : // Reverse calculate distance from charge (£1.30 per mile * 1.1 van multiplier)
-        50; // Fallback only if no server data
       
-      // Extract estimated time - parse from explanation string if available
+      // Parse distance from the server's breakdown string which contains the accurate Google Maps distance
+      const distanceBreakdownMatch = serverQuote.breakdown?.find((item: any) => 
+        typeof item === 'string' && item.includes('Distance (') && item.includes('miles)')
+      );
+      
+      let distance = 50; // Default fallback
+      if (distanceBreakdownMatch) {
+        const distanceMatch = distanceBreakdownMatch.match(/Distance \((\d+(?:\.\d+)?)\s*miles\)/);
+        if (distanceMatch) {
+          distance = parseFloat(distanceMatch[1]);
+        }
+      }
+      
+      // Extract estimated time from server explanation
       const estimatedTimeMatch = serverQuote.explanation?.match(/(\d+(?:\.\d+)?)\s*hour/);
       const estimatedTimeHours = estimatedTimeMatch ? parseFloat(estimatedTimeMatch[1]) : data.estimatedHours;
       
-      console.log("Extracted distance:", distance, "miles from server charge:", serverQuote.distanceCharge);
+      console.log("Using Google Maps distance:", distance, "miles");
+      console.log("Server breakdown:", serverQuote.breakdown);
       console.log("Estimated time:", estimatedTimeHours, "hours");
 
       // Combine time from the form with the date
