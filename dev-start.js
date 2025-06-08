@@ -1,8 +1,8 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
-// Start the server using node
-const server = spawn('node', ['server/basic-server.js'], {
+// Start the standalone server using node
+const server = spawn('node', ['server/standalone-server.js'], {
   cwd: process.cwd(),
   stdio: 'inherit',
   env: { ...process.env, NODE_ENV: 'development' }
