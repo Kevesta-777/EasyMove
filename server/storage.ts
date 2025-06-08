@@ -40,6 +40,7 @@ export interface IStorage {
 
   // Booking operations
   getBooking(id: number): Promise<Booking | undefined>;
+  getBookingByPaymentIntent(paymentIntentId: string): Promise<Booking | undefined>;
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBookingStatus(id: number, status: string): Promise<Booking | undefined>;
   getBookingsByCustomer(customerId: number): Promise<Booking[]>;

@@ -29,6 +29,9 @@ export default function StripeCheckout() {
   const { currentQuote, loadQuoteFromLocalStorage } = useQuote();
   const { toast } = useToast();
   const [customerEmail, setCustomerEmail] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [specialRequirements, setSpecialRequirements] = useState("");
   const [checkoutStarted, setCheckoutStarted] = useState(false);
   const [quotePrice, setQuotePrice] = useState(0);
 
@@ -148,8 +151,41 @@ export default function StripeCheckout() {
   const handleManualCheckout = async () => {
     if (isLoading || !currentQuote) return;
 
+    // Validate required fields
+    if (!customerEmail || !customerName || !customerPhone) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields (email, name, and phone number).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(customerEmail)) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsLoading(true);
+
+      // Store customer info in quote for booking creation
+      const updatedQuote = {
+        ...currentQuote,
+        customerEmail,
+        customerName,
+        customerPhone,
+        specialRequirements,
+      };
+
+      // Save updated quote to localStorage
+      localStorage.setItem('currentQuote', JSON.stringify(updatedQuote));
 
       const paymentData = {
         finalPrice: quotePrice,
@@ -158,7 +194,10 @@ export default function StripeCheckout() {
         deliveryAddress: currentQuote.deliveryAddress,
         vanSize: currentQuote.vanSize,
         moveDate: currentQuote.moveDate,
-        customerEmail: customerEmail || undefined,
+        customerEmail,
+        customerName,
+        customerPhone,
+        specialRequirements,
       };
 
       const response = await fetch("/api/create-stripe-checkout-session", {
@@ -233,21 +272,77 @@ export default function StripeCheckout() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="mb-4">
-                  <label
-                    htmlFor="customerEmail"
-                    className="block text-sm font-medium mb-1"
-                  >
-                    Email (for receipt)
-                  </label>
-                  <input
-                    type="email"
-                    id="customerEmail"
-                    value={customerEmail}
-                    onChange={(e) => setCustomerEmail(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 p-2 text-sm"
-                    placeholder="your@email.com"
-                  />
+                <div className="space-y-4 mb-4">
+                  <div>
+                    <label
+                      htmlFor="customerEmail"
+                      className="block text-sm font-medium mb-1"
+                    >
+                      Email (for receipt)*
+                    </label>
+                    <input
+                      type="email"
+                      id="customerEmail"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                      placeholder="your@email.com"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label
+                      htmlFor="customerName"
+                      className="block text-sm font-medium mb-1"
+                    >
+                      Full Name*
+                    </label>
+                    <input
+                      type="text"
+                      id="customerName"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                      placeholder="John Smith"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label
+                      htmlFor="customerPhone"
+                      className="block text-sm font-medium mb-1"
+                    >
+                      Phone Number*
+                    </label>
+                    <input
+                      type="tel"
+                      id="customerPhone"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                      placeholder="07123 456789"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label
+                      htmlFor="specialRequirements"
+                      className="block text-sm font-medium mb-1"
+                    >
+                      Special Requirements (optional)
+                    </label>
+                    <textarea
+                      id="specialRequirements"
+                      value={specialRequirements}
+                      onChange={(e) => setSpecialRequirements(e.target.value)}
+                      className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                      placeholder="Fragile items, heavy lifting, etc."
+                      rows={3}
+                    />
+                  </div>
                 </div>
 
                 <div className="text-sm text-gray-500 my-4 p-3 bg-blue-50 rounded-md">

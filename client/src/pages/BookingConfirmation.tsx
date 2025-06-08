@@ -61,15 +61,50 @@ export default function BookingConfirmation() {
           setBookingReference(ref);
           
           try {
-            // For a real application, you would fetch the booking details from the server
-            // by looking up the payment intent ID
-            // Here we just use the current quote
+            // Load quote and create booking in database
             if (!currentQuote) {
               loadQuoteFromLocalStorage();
             }
             
             if (currentQuote) {
-              setBookingDetails(currentQuote);
+              // Create booking in database after successful payment
+              try {
+                const response = await fetch('/api/confirm-booking', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    paymentIntentId,
+                    bookingDetails: {
+                      pickupAddress: currentQuote.pickupAddress,
+                      deliveryAddress: currentQuote.deliveryAddress,
+                      moveDate: currentQuote.moveDate,
+                      vanSize: currentQuote.vanSize,
+                      distance: currentQuote.distance,
+                      customerEmail: currentQuote.customerEmail || '',
+                      customerPhone: currentQuote.customerPhone || '',
+                      customerName: currentQuote.customerName || '',
+                      specialRequirements: currentQuote.specialRequirements || '',
+                      helpers: currentQuote.helpers || 0,
+                      floorAccess: currentQuote.floorAccess || 'ground',
+                      urgency: currentQuote.urgency || 'standard'
+                    }
+                  })
+                });
+
+                if (response.ok) {
+                  const bookingResult = await response.json();
+                  console.log('Booking saved to database:', bookingResult.bookingId);
+                  setBookingDetails(currentQuote);
+                } else {
+                  console.error('Failed to save booking to database');
+                  setBookingDetails(currentQuote);
+                }
+              } catch (bookingError) {
+                console.error('Error saving booking:', bookingError);
+                setBookingDetails(currentQuote);
+              }
             } else {
               // Fallback if no quote is available
               setBookingDetails({
