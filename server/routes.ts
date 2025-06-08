@@ -206,7 +206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .json({ error: "Payment processing unavailable" });
         }
 
-        const { amount } = req.body;
+        const { amount, bookingDetails } = req.body;
 
         if (!amount || amount <= 0) {
           return res.status(400).json({ error: "Valid amount is required" });
@@ -216,6 +216,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           amount: Math.round(amount * 100),
           currency: "gbp",
           automatic_payment_methods: { enabled: true },
+          metadata: {
+            bookingDetails: JSON.stringify(bookingDetails),
+          },
         });
 
         res.json({ clientSecret: paymentIntent.client_secret });
@@ -225,6 +228,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   );
+
+  // Payment confirmation and booking creation endpoint
+  app.post("/api/confirm-booking", async (req: Request, res: Response) => {
+    try {
+      const { paymentIntentId, bookingDetails } = req.body;
+
+      if (!stripeEnabled || !stripe) {
+        return res.status(503).json({ error: "Payment processing unavailable" });
+      }
+
+      // Verify payment intent was successful
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      
+      if (paymentIntent.status !== 'succeeded') {
+        return res.status(400).json({ error: "Payment not completed" });
+      }
+
+      // Create booking in database
+      const booking = await storage.createBooking({
+        customerId: null, // Guest booking for now
+        driverId: null, // To be assigned later
+        collectionAddress: bookingDetails.pickupAddress,
+        deliveryAddress: bookingDetails.deliveryAddress,
+        moveDate: new Date(bookingDetails.moveDate).toISOString().split('T')[0], // Convert to YYYY-MM-DD format
+        vanSize: bookingDetails.vanSize,
+        price: Math.round(paymentIntent.amount_received / 100), // Convert from pence to pounds
+        distance: bookingDetails.distance || 0,
+        status: 'confirmed',
+        paymentIntentId: paymentIntentId,
+        customerEmail: bookingDetails.customerEmail,
+        customerPhone: bookingDetails.customerPhone,
+        customerName: bookingDetails.customerName,
+        specialRequirements: bookingDetails.specialRequirements,
+        helpers: bookingDetails.helpers || 0,
+        floorAccess: bookingDetails.floorAccess || 'ground',
+        urgency: bookingDetails.urgency || 'standard'
+      });
+
+      console.log('Booking created successfully:', booking.id);
+      res.json({ success: true, bookingId: booking.id, booking });
+    } catch (error: unknown) {
+      console.error("Booking confirmation error:", error);
+      res.status(500).json({ error: "Failed to confirm booking" });
+    }
+  });
 
   // PayPal routes (non-prefixed for SDK compatibility)
   app.get("/setup", async (req: Request, res: Response) => {

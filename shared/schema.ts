@@ -100,6 +100,13 @@ export const bookings = pgTable("bookings", {
   distance: integer("distance").notNull(),
   urgency: text("urgency").default("standard"),
   status: text("status").notNull().default("pending"),
+  paymentIntentId: text("payment_intent_id"),
+  customerEmail: text("customer_email"),
+  customerPhone: text("customer_phone"),
+  customerName: text("customer_name"),
+  specialRequirements: text("special_requirements"),
+  helpers: integer("helpers").default(0),
+  floorAccess: text("floor_access").default("ground"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
