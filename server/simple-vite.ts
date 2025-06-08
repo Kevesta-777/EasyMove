@@ -1,4 +1,5 @@
 import { createServer as createViteServer } from "vite";
+import path from "path";
 import type { Express } from "express";
 import type { Server } from "http";
 
@@ -8,6 +9,13 @@ export async function setupSimpleVite(app: Express, server: Server) {
       server: { middlewareMode: true },
       appType: 'spa',
       root: './client',
+      resolve: {
+        alias: {
+          "@": path.resolve(process.cwd(), "client", "src"),
+          "@shared": path.resolve(process.cwd(), "shared"),
+          "@assets": path.resolve(process.cwd(), "attached_assets"),
+        },
+      },
       build: {
         outDir: '../dist/public',
       },

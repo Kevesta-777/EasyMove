@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic } from "./vite";
+import { setupSimpleVite, serveStatic } from "./simple-vite";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -21,7 +21,7 @@ async function startServer() {
     if (process.env.NODE_ENV === "production") {
       serveStatic(app);
     } else {
-      await setupVite(app, httpServer);
+      await setupSimpleVite(app, httpServer);
     }
     
     httpServer.listen(PORT, "0.0.0.0", () => {
