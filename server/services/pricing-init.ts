@@ -1,55 +1,66 @@
-import { db } from "../db";
-import { pricingModels } from "../../shared/schema";
-import { eq } from "drizzle-orm";
+import { storage } from "../storage";
 
 /**
- * Initialize default pricing model if it doesn't exist
+ * Initialize default pricing model if one doesn't exist
  */
 export async function initializeDefaultPricingModel() {
   try {
-    // Check if a default pricing model already exists
-    const existing = await db.select().from(pricingModels).where(eq(pricingModels.name, "default")).limit(1);
+    // Check if there's already an active pricing model
+    const existingModel = await storage.getActivePricingModel();
     
-    if (existing.length > 0) {
-      console.log("Default pricing model already exists");
-      return;
+    if (!existingModel) {
+      console.log("No active pricing model found, creating default model");
+      
+      // Create default pricing model
+      await storage.createPricingModel({
+        name: "Default Pricing Model",
+        basePrice: 50,
+        pricePerMile: 2.5,
+        vanSizeMultipliers: {
+          small: 1,
+          medium: 1.3,
+          large: 1.6,
+          luton: 2
+        },
+        urgencyMultipliers: {
+          standard: 1,
+          priority: 1.3,
+          express: 1.7
+        },
+        demandFactors: {
+          low: 0.9,
+          medium: 1.0,
+          high: 1.3,
+          veryHigh: 1.5
+        },
+        seasonalFactors: {
+          spring: 1.0,
+          summer: 1.1,
+          autumn: 1.0,
+          winter: 1.05,
+          holiday: 1.2
+        },
+        isActive: true
+      });
+      
+      // Initialize default area demand for major areas
+      const commonAreas = [
+        "Newcastle", "Newcastle upon Tyne", "Sunderland", "Durham", 
+        "Gateshead", "Middlesbrough", "Northumberland", "South Shields", 
+        "North Shields", "Darlington", "Stockton", "Hartlepool"
+      ];
+      
+      for (const area of commonAreas) {
+        await storage.updateAreaDemand(area, {
+          demandLevel: 1.0,
+          activeDrivers: 0,
+          pendingBookings: 0
+        });
+      }
+      
+      console.log("Default pricing model and area demand data initialized");
     }
-
-    // Create default pricing model
-    const defaultModel = {
-      name: "default",
-      basePricePerMile: 130, // £1.30 per mile in pence
-      vanSizeMultipliers: {
-        small: 1.0,
-        medium: 1.1,
-        large: 1.2,
-        luton: 1.3
-      },
-      urgencyMultipliers: {
-        standard: 1.0,
-        priority: 1.2,
-        express: 1.5
-      },
-      demandFactors: {
-        low: 0.9,
-        normal: 1.0,
-        high: 1.1,
-        peak: 1.2
-      },
-      seasonalFactors: {
-        low: 0.95,
-        normal: 1.0,
-        high: 1.05,
-        peak: 1.1
-      },
-      returnJourneyFactor: 0.35, // 35% of outbound journey cost
-      isActive: true
-    };
-
-    await db.insert(pricingModels).values(defaultModel);
-    console.log("Default pricing model created successfully");
   } catch (error) {
     console.error("Error initializing default pricing model:", error);
-    throw error;
   }
 }
