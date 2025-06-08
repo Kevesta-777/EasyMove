@@ -1,7 +1,8 @@
 const { spawn } = require('child_process');
-const path = require('path');
 
-// Start the server using node
+console.log('Starting EasyMove Man and Van Service...');
+
+// Start the basic server directly
 const server = spawn('node', ['server/basic-server.js'], {
   cwd: process.cwd(),
   stdio: 'inherit',
