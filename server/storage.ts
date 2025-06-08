@@ -156,6 +156,11 @@ export class DatabaseStorage implements IStorage {
     return booking;
   }
 
+  async getBookingByPaymentIntent(paymentIntentId: string): Promise<Booking | undefined> {
+    const [booking] = await db.select().from(bookings).where(eq(bookings.paymentIntentId, paymentIntentId));
+    return booking;
+  }
+
   async createBooking(insertBooking: InsertBooking): Promise<Booking> {
     const [booking] = await db.insert(bookings).values(insertBooking).returning();
     return booking;
