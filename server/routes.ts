@@ -245,6 +245,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Payment not completed" });
       }
 
+      // Check if booking already exists for this payment intent
+      const existingBooking = await storage.getBookingByPaymentIntent(paymentIntentId);
+      if (existingBooking) {
+        console.log('Booking already exists for payment intent:', paymentIntentId);
+        return res.json({ 
+          success: true, 
+          bookingId: existingBooking.id,
+          message: 'Booking already confirmed',
+          booking: existingBooking
+        });
+      }
+
       // Create booking in database
       const booking = await storage.createBooking({
         customerId: null, // Guest booking for now
