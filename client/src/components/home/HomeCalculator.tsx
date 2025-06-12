@@ -640,24 +640,23 @@ const HomeCalculator: React.FC = () => {
                       <FormLabel className="font-medium">
                         Estimated Hours
                       </FormLabel>
-                      <FormControl>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs text-gray-500">
-                            <span>1h</span>
-                            <span>8h</span>
-                          </div>
-                          <Slider
-                            defaultValue={[field.value]}
-                            min={1}
-                            max={8}
-                            step={1}
-                            onValueChange={(value) => field.onChange(value[0])}
-                          />
-                          <div className="text-center text-sm font-medium">
-                            {field.value} hour{field.value !== 1 ? "s" : ""}
-                          </div>
-                        </div>
-                      </FormControl>
+                      <Select
+                        onValueChange={(value) => field.onChange(Number(value))}
+                        value={field.value.toString()}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select hours" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {[1, 2, 3, 4, 5, 6, 7, 8].map((hour) => (
+                            <SelectItem key={hour} value={hour.toString()}>
+                              {hour} hour{hour !== 1 ? 's' : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -671,28 +670,21 @@ const HomeCalculator: React.FC = () => {
                       <FormLabel className="font-medium">
                         Additional Helpers
                       </FormLabel>
-                      <FormControl>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs text-gray-500">
-                            <span>None</span>
-                            <span>2 helpers</span>
-                          </div>
-                          <Slider
-                            defaultValue={[field.value]}
-                            min={0}
-                            max={2}
-                            step={1}
-                            onValueChange={(value) => field.onChange(value[0])}
-                          />
-                          <div className="text-center text-sm font-medium">
-                            {field.value === 0
-                              ? "No helpers"
-                              : field.value === 1
-                                ? "1 helper"
-                                : `${field.value} helpers`}
-                          </div>
-                        </div>
-                      </FormControl>
+                      <Select
+                        onValueChange={(value) => field.onChange(Number(value))}
+                        value={field.value.toString()}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select helpers" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="0">No helpers</SelectItem>
+                          <SelectItem value="1">1 helper</SelectItem>
+                          <SelectItem value="2">2 helpers</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
