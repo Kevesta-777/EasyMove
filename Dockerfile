@@ -42,7 +42,8 @@ RUN npm ci --only=production && npm cache clean --force
 
 # Copy built application
 COPY --from=builder --chown=easymove:nodejs /app/dist ./dist
-COPY --from=builder --chown=easymove:nodejs /app/client/dist ./client/dist
+# COPY --from=builder --chown=easymove:nodejs /app/client/dist ./client/dist
+COPY --from=builder --chown=easymove:nodejs /app/dist/public ./client/dist
 
 # Copy additional configuration files
 COPY --chown=easymove:nodejs drizzle.config.ts ./
