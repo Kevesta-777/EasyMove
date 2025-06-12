@@ -1,8 +1,71 @@
 import { db, pool } from "../db";
-import { drizzle } from "drizzle-orm/neon-serverless";
+import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
 import { initializeDefaultPricingModel } from "./pricing-init";
 import { sql } from "drizzle-orm";
+
+/**
+ * Update drivers table to use approval_status instead of is_approved
+ */
+async function updateDriversApprovalColumn() {
+  try {
+    // Check if approval_status column exists
+    const approvalStatusExists = await db.execute(sql`
+      SELECT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'drivers' 
+        AND column_name = 'approval_status'
+      )
+    `);
+
+    const isApprovedExists = await db.execute(sql`
+      SELECT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'drivers' 
+        AND column_name = 'is_approved'
+      )
+    `);
+
+    // If approval_status exists, we're good
+    if (approvalStatusExists.rows[0].exists) {
+      return;
+    }
+
+    // If is_approved exists but approval_status doesn't, we need to migrate
+    if (isApprovedExists.rows[0].exists) {
+      // Add new column
+      await db.execute(sql`
+        ALTER TABLE drivers ADD COLUMN approval_status TEXT DEFAULT 'pending';
+      `);
+
+      // Migrate existing data
+      await db.execute(sql`
+        UPDATE drivers 
+        SET approval_status = CASE 
+          WHEN is_approved = TRUE THEN 'approved'
+          WHEN is_approved = FALSE THEN 'pending'
+        END;
+      `);
+
+      // Drop old column
+      await db.execute(sql`
+        ALTER TABLE drivers DROP COLUMN is_approved;
+      `);
+    } else {
+      // If neither column exists, create approval_status with default
+      await db.execute(sql`
+        ALTER TABLE drivers ADD COLUMN approval_status TEXT DEFAULT 'pending';
+      `);
+    }
+
+    console.log("Drivers table updated with approval_status column");
+  } catch (error) {
+    console.error("Error updating drivers table:", error);
+    throw error;
+  }
+}
 
 /**
  * Initializes the database and runs necessary setup
@@ -14,6 +77,15 @@ export async function setupDatabase() {
     // Create schema if it doesn't exist
     console.log("Pushing schema to database...");
     await createTables();
+    
+    // Add payment and customer columns if they don't exist
+    await addPaymentColumns();
+    
+    // Add email, role, and is_active columns to users table if they don't exist
+    await addUserEmailColumn();
+    
+    // Update drivers table to use approval_status
+    await updateDriversApprovalColumn();
     
     // Initialize the default pricing model if needed
     try {
@@ -30,21 +102,250 @@ export async function setupDatabase() {
 }
 
 /**
+ * Add email, role, and is_active columns to users table if they don't exist
+ */
+async function addUserEmailColumn() {
+  try {
+    // Add email column
+    await db.execute(sql`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 
+          FROM information_schema.columns 
+          WHERE table_name = 'users' 
+          AND column_name = 'email'
+        ) THEN
+          ALTER TABLE users ADD COLUMN email TEXT;
+          -- Update existing users to use username as email
+          UPDATE users SET email = username WHERE email IS NULL;
+          -- Make email column NOT NULL and UNIQUE after setting values
+          ALTER TABLE users ALTER COLUMN email SET NOT NULL;
+          ALTER TABLE users ADD CONSTRAINT users_email_unique UNIQUE (email);
+        END IF;
+      END $$;
+    `);
+
+    // Add role column
+    await db.execute(sql`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 
+          FROM information_schema.columns 
+          WHERE table_name = 'users' 
+          AND column_name = 'role'
+        ) THEN
+          ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user';
+          -- Set admin role for admin@easymove.com if it exists
+          UPDATE users SET role = 'admin' WHERE email = 'admin@easymove.com';
+        END IF;
+      END $$;
+    `);
+
+    // Add is_active column
+    await db.execute(sql`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 
+          FROM information_schema.columns 
+          WHERE table_name = 'users' 
+          AND column_name = 'is_active'
+        ) THEN
+          ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+          -- Ensure admin@easymove.com is active if it exists
+          UPDATE users SET is_active = TRUE WHERE email = 'admin@easymove.com';
+        END IF;
+      END $$;
+    `);
+
+    console.log("Email, role, and is_active columns added to users table");
+  } catch (error) {
+    console.error("Error adding columns to users table:", error);
+    throw error;
+  }
+}
+
+/**
+ * Add payment and customer-related columns to the bookings table
+ */
+async function addPaymentColumns() {
+  try {
+    // Add payment_intent_id column if it doesn't exist
+    await db.execute(sql`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 
+          FROM information_schema.columns 
+          WHERE table_name = 'bookings' 
+          AND column_name = 'payment_intent_id'
+        ) THEN
+          ALTER TABLE bookings ADD COLUMN payment_intent_id TEXT;
+        END IF;
+      END $$;
+    `);
+
+    // Add payment_status column if it doesn't exist
+    await db.execute(sql`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 
+          FROM information_schema.columns 
+          WHERE table_name = 'bookings' 
+          AND column_name = 'payment_status'
+        ) THEN
+          ALTER TABLE bookings ADD COLUMN payment_status TEXT DEFAULT 'pending';
+        END IF;
+      END $$;
+    `);
+
+    // Add payment_method column if it doesn't exist
+    await db.execute(sql`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 
+          FROM information_schema.columns 
+          WHERE table_name = 'bookings' 
+          AND column_name = 'payment_method'
+        ) THEN
+          ALTER TABLE bookings ADD COLUMN payment_method TEXT;
+        END IF;
+      END $$;
+    `);
+
+    // Add payment_id column if it doesn't exist
+    await db.execute(sql`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 
+          FROM information_schema.columns 
+          WHERE table_name = 'bookings' 
+          AND column_name = 'payment_id'
+        ) THEN
+          ALTER TABLE bookings ADD COLUMN payment_id TEXT;
+        END IF;
+      END $$;
+    `);
+
+    // Add customer_email column if it doesn't exist
+    await db.execute(sql`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 
+          FROM information_schema.columns 
+          WHERE table_name = 'bookings' 
+          AND column_name = 'customer_email'
+        ) THEN
+          ALTER TABLE bookings ADD COLUMN customer_email TEXT;
+        END IF;
+      END $$;
+    `);
+
+    // Add customer_name column if it doesn't exist
+    await db.execute(sql`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 
+          FROM information_schema.columns 
+          WHERE table_name = 'bookings' 
+          AND column_name = 'customer_name'
+        ) THEN
+          ALTER TABLE bookings ADD COLUMN customer_name TEXT;
+        END IF;
+      END $$;
+    `);
+
+    // Add customer_phone column if it doesn't exist
+    await db.execute(sql`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 
+          FROM information_schema.columns 
+          WHERE table_name = 'bookings' 
+          AND column_name = 'customer_phone'
+        ) THEN
+          ALTER TABLE bookings ADD COLUMN customer_phone TEXT;
+        END IF;
+      END $$;
+    `);
+
+    // Add special_requirements column if it doesn't exist
+    await db.execute(sql`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 
+          FROM information_schema.columns 
+          WHERE table_name = 'bookings' 
+          AND column_name = 'special_requirements'
+        ) THEN
+          ALTER TABLE bookings ADD COLUMN special_requirements TEXT;
+        END IF;
+      END $$;
+    `);
+
+    // Add helpers column if it doesn't exist
+    await db.execute(sql`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 
+          FROM information_schema.columns 
+          WHERE table_name = 'bookings' 
+          AND column_name = 'helpers'
+        ) THEN
+          ALTER TABLE bookings ADD COLUMN helpers INTEGER DEFAULT 0;
+        END IF;
+      END $$;
+    `);
+
+    // Add floor_access column if it doesn't exist
+    await db.execute(sql`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (
+          SELECT 1 
+          FROM information_schema.columns 
+          WHERE table_name = 'bookings' 
+          AND column_name = 'floor_access'
+        ) THEN
+          ALTER TABLE bookings ADD COLUMN floor_access TEXT;
+        END IF;
+      END $$;
+    `);
+
+    console.log("Payment and customer columns added to bookings table");
+  } catch (error) {
+    console.error("Error adding payment and customer columns:", error);
+    throw error;
+  }
+}
+
+/**
  * Create all tables based on the schema 
  */
 async function createTables() {
   try {
-    // Create users table
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username TEXT NOT NULL UNIQUE,
+        email TEXT NOT NULL UNIQUE,
         password TEXT NOT NULL,
+        role TEXT DEFAULT 'user',
+        is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
     
-    // Create drivers table
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS drivers (
         id SERIAL PRIMARY KEY,
@@ -65,7 +366,6 @@ async function createTables() {
       )
     `);
     
-    // Create bookings table
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS bookings (
         id SERIAL PRIMARY KEY,
@@ -76,14 +376,13 @@ async function createTables() {
         move_date DATE NOT NULL,
         van_size TEXT NOT NULL,
         price INTEGER NOT NULL,
-        distance INTEGER NOT NULL,
+        distance REAL NOT NULL,
         urgency TEXT DEFAULT 'standard',
         status TEXT NOT NULL DEFAULT 'pending',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
     
-    // Create pricing_models table
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS pricing_models (
         id SERIAL PRIMARY KEY,
@@ -100,7 +399,6 @@ async function createTables() {
       )
     `);
     
-    // Create area_demand table
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS area_demand (
         id SERIAL PRIMARY KEY,

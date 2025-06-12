@@ -15,6 +15,9 @@ import {
   loadPaypalDefault,
 } from "./paypal";
 import Stripe from "stripe";
+import dotenv from 'dotenv';
+import adminRoutes from "./routes/admin-routes";
+import paypalRoutes from "./paypal-routes";
 
 // Initialize Stripe
 let stripe: Stripe | null = null;
@@ -303,9 +306,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(
     "/api/drivers/apply",
     upload.fields([
-      { name: "drivingLicense", maxCount: 1 },
-      { name: "insurance", maxCount: 1 },
-      { name: "vehicleRegistration", maxCount: 1 },
+      { name: "licenseDocument", maxCount: 1 },
+      { name: "insuranceDocument", maxCount: 1 },
+      { name: "liabilityDocument", maxCount: 1 },
+      { name: "vehiclePhoto", maxCount: 1 },
     ]),
     async (req: Request, res: Response) => {
       try {
@@ -314,26 +318,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
         const driverData = insertDriverSchema.parse({
           ...req.body,
-          drivingLicenseUrl: files.drivingLicense?.[0]?.path,
-          insuranceUrl: files.insurance?.[0]?.path,
-          vehicleRegistrationUrl: files.vehicleRegistration?.[0]?.path,
+          licenseDocument: files.licenseDocument?.[0]?.path,
+          insuranceDocument: files.insuranceDocument?.[0]?.path,
+          liabilityDocument: files.liabilityDocument?.[0]?.path,
+          vehiclePhoto: files.vehiclePhoto?.[0]?.path,
         });
+
+        // Check if driver already exists
+        const existingDriver = await storage.getDriverByEmail(driverData.email);
+        if (existingDriver) {
+          return res.status(400).json({ 
+            error: "Driver account already exists",
+            message: "A driver account with this email already exists. Please use a different email or contact support."
+          });
+        }
 
         const driver = await storage.createDriver(driverData);
         res.json({ success: true, driver });
       } catch (error: unknown) {
         console.error("Driver application error:", error);
-        res.status(500).json({ error: "Failed to process driver application" });
+        if (error instanceof Error) {
+          res.status(400).json({ 
+            error: "Failed to process driver application",
+            message: error.message
+          });
+        } else {
+          res.status(500).json({ 
+            error: "Failed to process driver application",
+            message: "An unexpected error occurred"
+          });
+        }
       }
     },
   );
 
+  app.use('/api/admin', adminRoutes);
+  app.use('/api/paypal', paypalRoutes);
+
   // Admin routes
   app.post("/api/admin/signup", async (req: Request, res: Response) => {
     try {
-      const { email, password, registrationKey } = req.body;
+      const { email, password, adminKey } = req.body;
 
-      if (registrationKey !== "easymove2025") {
+      if (adminKey !== "easymove2025") {
         return res.status(403).json({ error: "Invalid registration key" });
       }
 
@@ -348,13 +375,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: email.split('@')[0],
         email,
         password, // In production, this should be hashed
-        role: "admin"
+        role: "admin",
+        isActive: true
       });
 
-      res.json({ success: true, message: "Admin account created", admin: { id: adminUser.id, email: adminUser.email, role: adminUser.role } });
+      if (!adminUser) {
+        throw new Error("Failed to create admin user");
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Admin account created", 
+        user: { 
+          id: adminUser.id, 
+          email: adminUser.email, 
+          role: adminUser.role,
+          username: adminUser.username
+        } 
+      });
     } catch (error: unknown) {
       console.error("Admin signup error:", error);
-      res.status(500).json({ error: "Failed to create admin account" });
+      res.status(500).json({ 
+        error: "Failed to create admin account",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 
@@ -435,46 +479,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  app.get("/api/admin/dashboard", async (req: Request, res: Response) => {
-    try {
-      const bookings = await storage.getAllBookings();
-      const users = await storage.getAllUsers();
-      const drivers = await storage.getAllDrivers();
+  // Register admin routes
+  app.use('/api/admin', adminRoutes);
 
-      const stats = {
-        totalBookings: bookings.length,
-        totalUsers: users.length,
-        totalDrivers: drivers.length,
-        pendingDrivers: drivers.filter((d: any) => !d.isApproved).length,
-        totalRevenue: bookings.reduce(
-          (sum: number, booking: any) => sum + (booking.totalPrice || 0),
-          0,
-        ),
-        platformRevenue: bookings.reduce(
-          (sum: number, booking: any) => sum + (booking.totalPrice || 0) * 0.25,
-          0,
-        ),
-      };
+  // Register PayPal routes
+  app.use('/api/paypal', paypalRoutes);
 
-      res.json({ stats, recentBookings: bookings.slice(0, 10) });
-    } catch (error: unknown) {
-      console.error("Dashboard stats error:", error);
-      res.status(500).json({ error: "Failed to fetch dashboard data" });
-    }
-  });
-
-  // Admin bookings endpoint
-  app.get("/api/admin/bookings", async (req: Request, res: Response) => {
-    try {
-      const bookings = await storage.getAllBookingsWithDetails();
-      res.json({ bookings });
-    } catch (error: unknown) {
-      console.error("Get bookings error:", error);
-      res.status(500).json({ error: "Failed to fetch bookings" });
-    }
-  });
-
-  // Driver decline endpoint
+  // Driver decline endpoint (keeping this one as it's not duplicated)
   app.post("/api/admin/drivers/:id/decline", async (req: Request, res: Response) => {
     try {
       const driverId = parseInt(req.params.id);

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Favicon Generator</title>
+    <script>
+        function createFavicon() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 16;
+            canvas.height = 16;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw a simple van icon
+            ctx.fillStyle = '#0052cc'; // EasyMove blue color
+            ctx.fillRect(4, 4, 8, 4); // Body
+            ctx.fillRect(4, 8, 3, 2); // Window
+            ctx.fillRect(9, 8, 3, 2); // Window
+            ctx.fillStyle = '#000';
+            ctx.fillRect(4, 12, 2, 2); // Wheel
+            ctx.fillRect(10, 12, 2, 2); // Wheel
+            
+            const data = canvas.toDataURL('image/x-icon');
+            const img = document.createElement('img');
+            img.src = data;
+            document.body.appendChild(img);
+            
+            // Create download link
+            const link = document.createElement('a');
+            link.download = 'favicon.ico';
+            link.href = data;
+            link.click();
+        }
+        
+        createFavicon();
+    </script>
+</head>
+<body>
+</body>
+</html>

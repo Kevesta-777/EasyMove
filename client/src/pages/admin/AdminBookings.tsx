@@ -11,6 +11,28 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
+interface Booking {
+  id: number;
+  status: string;
+  moveDate: string;
+  vanSize: string;
+  price: number;
+  distance: number;
+  collectionAddress: string;
+  deliveryAddress: string;
+  createdAt: string;
+  customer?: {
+    id: number;
+    username: string;
+    email: string;
+  };
+  driver?: {
+    id: number;
+    name: string;
+    phone: string;
+  };
+}
+
 export default function AdminBookings() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -20,25 +42,59 @@ export default function AdminBookings() {
 
   const { data: bookings, isLoading } = useQuery({
     queryKey: ['/api/admin/bookings', searchTerm, statusFilter],
+    queryFn: async ({ queryKey }) => {
+      const [_path, _searchTerm, _statusFilter] = queryKey;
+      const params = new URLSearchParams({
+        searchTerm: _searchTerm,
+        status: _statusFilter
+      });
+      const response = await apiRequest({
+        method: 'GET',
+        url: `/api/admin/bookings?${params.toString()}`
+      });
+      return response;
+    },
+    staleTime: 5 * 60 * 1000 // 5 minutes
   });
 
   const updateBookingMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      const response = await apiRequest('POST', `/api/admin/booking/${id}/update`, { status });
-      if (!response.ok) throw new Error('Failed to update booking');
-      return response.json();
+      try {
+        const response = await apiRequest({
+          method: 'POST',
+          url: `/api/admin/booking/${id}/update`,
+          data: { status }
+        });
+        if (!response?.success) {
+          throw new Error('Failed to update booking');
+        }
+        return response.booking;
+      } catch (error) {
+        console.error('Error updating booking:', error);
+        throw error;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (updatedBooking) => {
       toast({
         title: "Booking Updated",
         description: "Booking status has been updated successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/bookings'] });
+      
+      // Update the specific booking in the cache immediately
+      queryClient.setQueryData(['/api/admin/bookings'], (oldData: any) => {
+        if (!oldData) return oldData;
+        return oldData.map((booking: any) => 
+          booking.id === updatedBooking.id ? updatedBooking : booking
+        );
+      });
+      
+      // Invalidate the query to fetch fresh data
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/bookings', searchTerm, statusFilter] });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: "Failed to update booking status",
+        description: error?.message || "Failed to update booking status",
         variant: "destructive",
       });
     },
@@ -151,77 +207,85 @@ export default function AdminBookings() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {bookings?.map((booking: any) => (
-                      <TableRow key={booking.id}>
-                        <TableCell className="font-medium">#{booking.id}</TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{booking.customer?.username || 'Unknown'}</p>
-                            <p className="text-sm text-gray-500">{booking.customer?.email}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="max-w-xs">
-                            <p className="text-sm font-medium truncate">{booking.collectionAddress}</p>
-                            <p className="text-sm text-gray-500 truncate">→ {booking.deliveryAddress}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {new Date(booking.moveDate).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{booking.vanSize}</Badge>
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {formatPrice(booking.price)}
-                        </TableCell>
-                        <TableCell>{booking.distance} miles</TableCell>
-                        <TableCell>
-                          <Select 
-                            value={booking.status} 
-                            onValueChange={(value) => handleStatusUpdate(booking.id, value)}
-                          >
-                            <SelectTrigger className="w-32">
-                              <Badge variant={getStatusColor(booking.status)}>
-                                {booking.status}
-                              </Badge>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="assigned">Assigned</SelectItem>
-                              <SelectItem value="in_progress">In Progress</SelectItem>
-                              <SelectItem value="completed">Completed</SelectItem>
-                              <SelectItem value="cancelled">Cancelled</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          {booking.driver ? (
-                            <div>
-                              <p className="font-medium">{booking.driver.name}</p>
-                              <p className="text-sm text-gray-500">{booking.driver.phone}</p>
-                            </div>
-                          ) : (
-                            <Badge variant="secondary">Unassigned</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            <Button variant="ghost" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </div>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={10} className="text-center py-8">
+                          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
                         </TableCell>
                       </TableRow>
-                    )) || (
+                    ) : bookings?.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={10} className="text-center py-8 text-gray-500">
                           No bookings found
                         </TableCell>
                       </TableRow>
+                    ) : (
+                      bookings.map((booking: Booking) => (
+                        <TableRow key={booking.id}>
+                          <TableCell className="font-medium">#{booking.id}</TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{booking.customer?.username || 'Unknown'}</p>
+                              <p className="text-sm text-gray-500">{booking.customer?.email}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="max-w-xs">
+                              <p className="text-sm font-medium truncate">{booking.collectionAddress}</p>
+                              <p className="text-sm text-gray-500 truncate">→ {booking.deliveryAddress}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(booking.moveDate).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{booking.vanSize}</Badge>
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {formatPrice(booking.price)}
+                          </TableCell>
+                          <TableCell>{booking.distance} miles</TableCell>
+                          <TableCell>
+                            <Select 
+                              value={booking.status} 
+                              onValueChange={(value) => handleStatusUpdate(booking.id, value)}
+                            >
+                              <SelectTrigger className="w-32">
+                                <Badge variant={getStatusColor(booking.status)}>
+                                  {booking.status}
+                                </Badge>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="assigned">Assigned</SelectItem>
+                                <SelectItem value="in_progress">In Progress</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            {booking.driver ? (
+                              <div>
+                                <p className="font-medium">{booking.driver.name}</p>
+                                <p className="text-sm text-gray-500">{booking.driver.phone}</p>
+                              </div>
+                            ) : (
+                              <Badge variant="secondary">Unassigned</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex space-x-2">
+                              <Button variant="ghost" size="sm">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm">
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
                     )}
                   </TableBody>
                 </Table>

@@ -19,13 +19,19 @@ import { Request, Response } from "express";
 
 const { PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET } = process.env;
 
-if (!PAYPAL_CLIENT_ID) {
-  throw new Error("Missing PAYPAL_CLIENT_ID");
+// Make PayPal optional in development mode
+const isDevelopment = process.env.NODE_ENV === 'development';
+if (!isDevelopment) {
+  if (!PAYPAL_CLIENT_ID) {
+    throw new Error("Missing PAYPAL_CLIENT_ID");
+  }
+  if (!PAYPAL_CLIENT_SECRET) {
+    throw new Error("Missing PAYPAL_CLIENT_SECRET");
+  }
 }
-if (!PAYPAL_CLIENT_SECRET) {
-  throw new Error("Missing PAYPAL_CLIENT_SECRET");
-}
-const client = new Client({
+
+// Initialize PayPal client only if credentials are available
+const client = PAYPAL_CLIENT_ID && PAYPAL_CLIENT_SECRET ? new Client({
   clientCredentialsAuthCredentials: {
     oAuthClientId: PAYPAL_CLIENT_ID,
     oAuthClientSecret: PAYPAL_CLIENT_SECRET,
@@ -44,13 +50,21 @@ const client = new Client({
       logHeaders: true,
     },
   },
-});
-const ordersController = new OrdersController(client);
-const oAuthAuthorizationController = new OAuthAuthorizationController(client);
+}) : null;
+
+const ordersController = client ? new OrdersController(client) : null;
+const oAuthAuthorizationController = client ? new OAuthAuthorizationController(client) : null;
 
 /* Token generation helpers */
 
 export async function getClientToken() {
+  if (!client || !oAuthAuthorizationController) {
+    if (isDevelopment) {
+      return "development-token";
+    }
+    throw new Error("PayPal client not initialized");
+  }
+
   const auth = Buffer.from(
     `${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`,
   ).toString("base64");
@@ -68,6 +82,13 @@ export async function getClientToken() {
 /*  Process transactions */
 
 export async function createPaypalOrder(req: Request, res: Response) {
+  if (!ordersController) {
+    if (isDevelopment) {
+      return res.json({ id: "dev-order-id", status: "CREATED" });
+    }
+    return res.status(500).json({ error: "PayPal is not configured" });
+  }
+
   try {
     const { amount, currency, intent } = req.body;
 
@@ -120,6 +141,13 @@ export async function createPaypalOrder(req: Request, res: Response) {
 }
 
 export async function capturePaypalOrder(req: Request, res: Response) {
+  if (!ordersController) {
+    if (isDevelopment) {
+      return res.json({ id: "dev-order-id", status: "COMPLETED" });
+    }
+    return res.status(500).json({ error: "PayPal is not configured" });
+  }
+
   try {
     const { orderID } = req.params;
     const collect = {

@@ -1,19 +1,14 @@
-
 import pg from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from '../shared/schema';
+import { dbConfig, connectionString } from './config';
 
 const { Pool } = pg;
 
-if (!process.env.DATABASE_URL) {
-  console.error('DATABASE_URL environment variable is not set');
-  process.exit(1);
-}
-
 // Create PostgreSQL pool with enhanced configuration for stability
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }, // Enable SSL for Neon
+  ...dbConfig,
+  connectionString,
   max: 10, // Reduced pool size for stability
   min: 2, // Minimum connections
   idleTimeoutMillis: 20000, // Shorter idle timeout
@@ -40,7 +35,7 @@ pool.on('remove', () => {
 // Create drizzle database instance
 export const db = drizzle(pool, { schema });
 
-// Export pool for direct queries if needed
+// Export pool and health check function
 export { pool };
 
 // Health check function
@@ -55,4 +50,7 @@ export const checkDbConnection = async () => {
     console.error('Database connection failed:', error);
     return false;
   }
-};
+}
+
+// Initial connection check
+checkDbConnection().catch(console.error);

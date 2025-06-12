@@ -33,33 +33,42 @@ import MobileMenu from "./components/layout/MobileMenu";
 import { QuoteProvider } from "@/contexts/QuoteContext";
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
+import { AuthProvider } from "./contexts/AuthContext";
+import { withProtectedRoute } from "./components/routing/ProtectedRoute";
 
+const ProtectedAdminDashboard = withProtectedRoute(AdminDashboard);
+const ProtectedAdminBookings = withProtectedRoute(AdminBookings);
+const ProtectedAdminDrivers = withProtectedRoute(AdminDrivers);
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/driver-registration" component={DriverRegistration} />
-      <Route path="/terms-and-conditions" component={TermsAndConditions} />
-      <Route path="/checkout" component={Checkout} />
-      <Route path="/booking-confirmation" component={BookingConfirmation} />
-      <Route path="/stripe-config" component={StripeConfig} />
-      <Route path="/paypal-checkout" component={PayPalCheckout} />
-      <Route path="/stripe-checkout" component={StripeCheckout} />
-      <Route path="/embedded-checkout" component={EmbeddedStripeCheckout} />
-      <Route path="/distance-calculator" component={DistanceCalculator} />
-      <Route path="/calculator" component={CalculatorPage} />
-      <Route path="/payment-test" component={PaymentTester} />
-      <Route path="/quote" component={DetailedQuote} />
-      <Route path="/test-detailed-quotes" component={TestDetailedQuotes} />
-      <Route path="/booking-tracker" component={BookingTracker} />
-      <Route path="/admin/login" component={AdminLogin} />
-      <Route path="/admin/signup" component={AdminSignup} />
-      <Route path="/admin/dashboard" component={AdminDashboard} />
-      <Route path="/admin/bookings" component={AdminBookings} />
-      <Route path="/admin/drivers" component={AdminDrivers} />
-      <Route component={NotFound} />
-    </Switch>
+    <AuthProvider>
+      <div>
+        <Switch>
+          <Route path="/" component={Home} />
+          <Route path="/driver-registration" component={DriverRegistration} />
+          <Route path="/terms-and-conditions" component={TermsAndConditions} />
+          <Route path="/checkout" component={Checkout} />
+          <Route path="/booking-confirmation" component={BookingConfirmation} />
+          <Route path="/stripe-config" component={StripeConfig} />
+          <Route path="/paypal-checkout" component={PayPalCheckout} />
+          <Route path="/stripe-checkout" component={StripeCheckout} />
+          <Route path="/embedded-checkout" component={EmbeddedStripeCheckout} />
+          <Route path="/distance-calculator" component={DistanceCalculator} />
+          <Route path="/calculator" component={CalculatorPage} />
+          <Route path="/payment-test" component={PaymentTester} />
+          <Route path="/quote" component={DetailedQuote} />
+          <Route path="/test-detailed-quotes" component={TestDetailedQuotes} />
+          <Route path="/booking-tracker" component={BookingTracker} />
+          <Route path="/admin/login" component={AdminLogin} />
+          <Route path="/admin/signup" component={AdminSignup} />
+          <Route path="/admin/dashboard" component={ProtectedAdminDashboard} />
+          <Route path="/admin/bookings" component={ProtectedAdminBookings} />
+          <Route path="/admin/drivers" component={ProtectedAdminDrivers} />
+          <Route component={NotFound} />
+        </Switch>
+      </div>
+    </AuthProvider>
   );
 }
 

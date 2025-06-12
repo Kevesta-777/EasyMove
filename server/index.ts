@@ -1,8 +1,12 @@
+import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import { registerRoutes } from './routes';
 import { setupDatabase } from './services/db-setup';
 import { setupVite } from './vite';
+
+// Configure environment variables
+dotenv.config();
 
 // ========== PayPal Integration Imports ==========
 import { 
@@ -13,7 +17,7 @@ import {
 } from './paypal';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = parseInt(process.env.PORT || '5000', 10);
 
 // Middleware
 app.use(cors());

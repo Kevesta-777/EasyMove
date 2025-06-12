@@ -57,14 +57,21 @@ export default function DriverRegistrationForm() {
       name: "",
       email: "",
       phone: "",
+      experience: "0-1",
+      vanType: "small",
       location: "",
-      agreement: false,
+      licenseDocument: undefined,
+      insuranceDocument: undefined,
+      liabilityDocument: undefined,
+      vehiclePhoto: undefined,
+      agreement: true,
     },
   });
 
-  async function onSubmit(data: DriverFormValues) {
-    setIsSubmitting(true);
+  const onSubmit = async (data: DriverFormValues) => {
     try {
+      setIsSubmitting(true);
+      
       // Create FormData to handle file uploads
       const formData = new FormData();
       formData.append("name", data.name);
@@ -73,17 +80,24 @@ export default function DriverRegistrationForm() {
       formData.append("experience", data.experience);
       formData.append("vanType", data.vanType);
       formData.append("location", data.location);
-      formData.append("licenseDocument", data.licenseDocument);
-      formData.append("insuranceDocument", data.insuranceDocument);
-      formData.append("liabilityDocument", data.liabilityDocument);
-      formData.append("vehiclePhoto", data.vehiclePhoto);
+      
+      // Only append files if they exist
+      if (data.licenseDocument) formData.append("licenseDocument", data.licenseDocument);
+      if (data.insuranceDocument) formData.append("insuranceDocument", data.insuranceDocument);
+      if (data.liabilityDocument) formData.append("liabilityDocument", data.liabilityDocument);
+      if (data.vehiclePhoto) formData.append("vehiclePhoto", data.vehiclePhoto);
 
       // Submit form data to API
-      await fetch('/api/drivers/register', {
+      const response = await fetch('/api/drivers/apply', {
         method: 'POST',
         body: formData,
         credentials: 'include'
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error: ${errorText}`);
+      }
 
       toast({
         title: "Application Submitted",
@@ -102,7 +116,8 @@ export default function DriverRegistrationForm() {
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
+
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -177,7 +192,6 @@ export default function DriverRegistrationForm() {
                         <SelectItem value="5+">5+ years</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -201,7 +215,6 @@ export default function DriverRegistrationForm() {
                         <SelectItem value="luton">Luton Van</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -213,7 +226,7 @@ export default function DriverRegistrationForm() {
                   <FormItem>
                     <FormLabel className="font-medium">Location</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter your city" {...field} />
+                      <Input placeholder="Enter your location" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -230,16 +243,17 @@ export default function DriverRegistrationForm() {
               <FormField
                 control={form.control}
                 name="licenseDocument"
-                render={({ field: { value, onChange, ...field } }) => (
+                render={({ field }) => (
                   <FormItem>
                     <FormLabel className="font-medium">Driver's License</FormLabel>
                     <FormControl>
                       <FileInput
-                        icon={<IdCard className="text-gray-400 text-3xl mb-2" />}
                         text="Upload your driver's license (front and back)"
-                        accept="image/*,.pdf"
-                        onChange={(file) => onChange(file)}
-                        {...field}
+                        icon={<IdCard className="text-gray-400 text-3xl mb-2" />}
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(file: File | null) => {
+                          if (file) field.onChange(file);
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -250,16 +264,17 @@ export default function DriverRegistrationForm() {
               <FormField
                 control={form.control}
                 name="insuranceDocument"
-                render={({ field: { value, onChange, ...field } }) => (
+                render={({ field }) => (
                   <FormItem>
                     <FormLabel className="font-medium">Insurance Certificate</FormLabel>
                     <FormControl>
                       <FileInput
-                        icon={<FileText className="text-gray-400 text-3xl mb-2" />}
                         text="Upload your vehicle insurance document"
-                        accept="image/*,.pdf"
-                        onChange={(file) => onChange(file)}
-                        {...field}
+                        icon={<FileText className="text-gray-400 text-3xl mb-2" />}
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(file: File | null) => {
+                          if (file) field.onChange(file);
+                        }}
                       />
                     </FormControl>
                     <FormMessage />

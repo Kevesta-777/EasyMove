@@ -69,7 +69,7 @@ export const drivers = pgTable("drivers", {
   insuranceDocument: text("insurance_document").notNull(),
   liabilityDocument: text("liability_document").notNull(),
   vehiclePhoto: text("vehicle_photo").notNull(),
-  isApproved: boolean("is_approved").default(false),
+  approvalStatus: text("approval_status").notNull().default("pending"), // pending, approved, declined
   rating: real("rating"),
   completedJobs: integer("completed_jobs").default(0),
   createdAt: timestamp("created_at").defaultNow(),
@@ -97,7 +97,7 @@ export const bookings = pgTable("bookings", {
   moveDate: date("move_date").notNull(),
   vanSize: text("van_size").notNull(),
   price: integer("price").notNull(),
-  distance: integer("distance").notNull(),
+  distance: real("distance").notNull(), // Changed from integer to real to support decimal distances
   urgency: text("urgency").default("standard"),
   status: text("status").notNull().default("pending"),
   paymentIntentId: text("payment_intent_id"),

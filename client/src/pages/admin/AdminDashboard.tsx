@@ -54,18 +54,39 @@ export default function AdminDashboard() {
     }
   }, [setLocation]);
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery<AdminStats>({
     queryKey: ['/api/admin/stats'],
+    queryFn: async () => {
+      const response = await apiRequest({
+        method: 'GET',
+        url: '/api/admin/stats'
+      });
+      return response;
+    },
     enabled: !!adminAuth,
   });
 
   const { data: recentBookings, isLoading: bookingsLoading } = useQuery({
     queryKey: ['/api/admin/recent-bookings'],
+    queryFn: async () => {
+      const response = await apiRequest({
+        method: 'GET',
+        url: '/api/admin/recent-bookings'
+      });
+      return response;
+    },
     enabled: !!adminAuth,
   });
 
   const { data: pendingDrivers, isLoading: driversLoading } = useQuery({
     queryKey: ['/api/admin/pending-drivers'],
+    queryFn: async () => {
+      const response = await apiRequest({
+        method: 'GET',
+        url: '/api/admin/pending-drivers'
+      });
+      return response;
+    },
     enabled: !!adminAuth,
   });
 
@@ -99,12 +120,12 @@ export default function AdminDashboard() {
             <div className="flex items-center">
               <h1 className="text-xl font-semibold text-gray-900">Admin Dashboard</h1>
               <Badge variant="secondary" className="ml-3">
-                {adminAuth.role}
+                {adminAuth?.role || 'Admin'}
               </Badge>
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600">
-                Welcome, {adminAuth.user.username}
+                Welcome, {adminAuth?.user?.username || 'Admin'}
               </span>
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
@@ -288,25 +309,27 @@ export default function AdminDashboard() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {recentBookings?.map((booking: any) => (
-                    <div key={booking.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">Booking #{booking.id}</p>
-                        <p className="text-sm text-gray-600">
-                          {booking.collectionAddress} → {booking.deliveryAddress}
-                        </p>
+                  {Array.isArray(recentBookings) && recentBookings.length > 0 ? (
+                    recentBookings.map((booking: any) => (
+                      <div key={booking.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <p className="font-medium">Booking #{booking.id}</p>
+                          <p className="text-sm text-gray-600">
+                            {booking.collectionAddress} → {booking.deliveryAddress}
+                          </p>
+                        </div>
+                        <Badge 
+                          variant={
+                            booking.status === 'completed' ? 'default' :
+                            booking.status === 'pending' ? 'secondary' :
+                            booking.status === 'in_progress' ? 'outline' : 'destructive'
+                          }
+                        >
+                          {booking.status}
+                        </Badge>
                       </div>
-                      <Badge 
-                        variant={
-                          booking.status === 'completed' ? 'default' :
-                          booking.status === 'pending' ? 'secondary' :
-                          booking.status === 'in_progress' ? 'outline' : 'destructive'
-                        }
-                      >
-                        {booking.status}
-                      </Badge>
-                    </div>
-                  )) || (
+                    ))
+                  ) : (
                     <p className="text-center text-gray-500 py-4">No recent bookings</p>
                   )}
                 </div>
