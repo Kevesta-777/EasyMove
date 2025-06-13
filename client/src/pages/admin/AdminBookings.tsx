@@ -129,7 +129,7 @@ export default function AdminBookings() {
                 variant="ghost" 
                 size="sm" 
                 onClick={() => setLocation('/admin/dashboard')}
-                className="mr-4"
+                className="flex items-center justify-center mr-10 rounded-full"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Dashboard

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Loader2, CheckCircle, Clock, Mail, Phone, Car, MapPin, FileText, User, XCircle, Check, X, ArrowLeft } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from '@/hooks/use-toast';
-
+import { useLocation } from 'wouter';
 
 interface Driver {
   id: number;
@@ -26,6 +26,7 @@ interface Driver {
 }
 
 export default function AdminDrivers() {
+  const [, setLocation] = useLocation();
   const [loading, setLoading] = useState(true);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [error, setError] = useState('');
@@ -144,13 +145,15 @@ export default function AdminDrivers() {
         <div className="container mx-auto py-8">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold">Driver Management</h1>
-            <a
-              href="/admin/dashboard"
-              className="flex items-center space-x-2 text-blue-600 hover:text-blue-800"
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setLocation('/admin/dashboard')}
+              className="mr-4 rounded-full"
             >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back to Dashboard</span>
-            </a>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
           </div>
           <p className="text-gray-600 mt-2">Review and manage driver applications and approvals</p>
         </div>
