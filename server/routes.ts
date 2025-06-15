@@ -16,8 +16,10 @@ import {
 } from "./paypal";
 import Stripe from "stripe";
 import dotenv from 'dotenv';
-import adminRoutes from "./routes/admin-routes";
+import { adminRoutes } from "./routes/admin-routes";
 import paypalRoutes from "./paypal-routes";
+import { paymentRoutes } from "./routes/payment-routes";
+import type { FloorAccess } from "@shared/schema";
 
 // Initialize Stripe
 let stripe: Stripe | null = null;
@@ -125,6 +127,9 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Register admin routes
+  app.use('/api/admin', adminRoutes);
+
   // Health check endpoint
   app.get("/health", (req: Request, res: Response) => {
     res.json({
@@ -178,7 +183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         vanSize: validatedData.vanSize,
         estimatedHours: 2,
         numHelpers: validatedData.helpers || 0,
-        floorAccess: validatedData.floorAccess || "ground",
+        floorAccess: validatedData.floorAccess as FloorAccess || "ground",
         liftAvailable: false,
         moveDate: new Date(validatedData.moveDate),
         urgency: validatedData.urgency || "standard",
@@ -478,12 +483,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   );
-
-  // Register admin routes
-  app.use('/api/admin', adminRoutes);
-
-  // Register PayPal routes
-  app.use('/api/paypal', paypalRoutes);
 
   // Driver decline endpoint (keeping this one as it's not duplicated)
   app.post("/api/admin/drivers/:id/decline", async (req: Request, res: Response) => {

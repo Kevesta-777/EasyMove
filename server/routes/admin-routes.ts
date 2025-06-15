@@ -1,8 +1,19 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
-import { bookings, users, drivers } from '../../shared/schema';
-import { eq, gte, count, sum, desc, or, ilike } from 'drizzle-orm';
+import { bookings, drivers, paymentIntents } from '../../shared/schema';
+import { eq, gte, count, sum, desc, or, ilike, not, isNotNull } from 'drizzle-orm';
 import { z } from 'zod';
+import { users } from '../../shared/schema';
+
+// Type for user response
+interface UserResponse {
+  id: number;
+  username: string;
+  email: string | null;
+  role: string;
+  isActive: boolean;
+  createdAt: Date;
+}
 
 // Type for booking response
 interface BookingResponse {
@@ -28,6 +39,67 @@ interface BookingResponse {
 }
 
 const router = Router();
+
+// Get all users
+router.get('/users', async (req: Request, res: Response) => {
+  try {
+    const userQuery = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        role: users.role,
+        isActive: users.isActive,
+        createdAt: users.createdAt
+      })
+      .from(users);
+    res.json(userQuery);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// Update user status
+router.put('/users/:userId/status', async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const { isActive } = req.body;
+
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ error: 'isActive must be a boolean value' });
+    }
+
+    await db.update(users)
+      .set({ isActive })
+      .where(eq(users.id, userId));
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating user status:', error);
+    res.status(500).json({ error: 'Failed to update user status' });
+  }
+});
+
+// Delete user
+router.delete('/users/:userId', async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    
+    // First check if user exists
+    const userQuery = await db.select().from(users).where(eq(users.id, userId)).then(([result]) => result);
+    if (!userQuery) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Delete user
+    await db.delete(users).where(eq(users.id, userId));
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
 
 // Admin statistics endpoint
 router.get('/stats', async (req: Request, res: Response) => {
@@ -183,6 +255,32 @@ router.post('/drivers/:id/status', async (req: Request, res: Response) => {
   }
 });
 
+  // Payments endpoint
+  router.get('/payments', async (req: Request, res: Response) => {
+    try {
+      // Get all payments from bookings table
+      const payments = await db
+        .select({
+          id: bookings.id,
+          bookingId: bookings.id,
+          amount: bookings.price,
+          status: bookings.status,
+          paymentIntentId: bookings.paymentIntentId,
+          customerName: bookings.customerName,
+          customerEmail: bookings.customerEmail,
+          createdAt: bookings.createdAt
+        })
+        .from(bookings)
+        .where(isNotNull(bookings.paymentIntentId))
+        .orderBy(desc(bookings.createdAt));
+
+      res.json(payments);
+    } catch (error) {
+      console.error('Error fetching payments:', error);
+      res.status(500).json({ error: 'Failed to fetch payments' });
+    }
+  });
+
   // Bookings endpoint
   router.get('/bookings', async (req: Request, res: Response) => {
     try {
@@ -233,8 +331,8 @@ router.post('/drivers/:id/status', async (req: Request, res: Response) => {
           ...row,
           customer: row.customerId ? {
             id: row.customerId,
-            username: users.username,
-            email: users.email
+            username: row.username,
+            email: row.email
           } : null,
           driver: row.driverId ? {
             id: row.driverId,
@@ -297,4 +395,4 @@ router.post('/drivers/:id/status', async (req: Request, res: Response) => {
     }
   });
 
-  export default router;
+  export const adminRoutes = router;

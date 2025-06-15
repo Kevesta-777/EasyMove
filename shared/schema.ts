@@ -3,6 +3,9 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
+// Define FloorAccess type to match pricing-rules.ts
+export type FloorAccess = 'ground' | 'firstFloor' | 'secondFloor' | 'thirdFloorPlus';
+
 // Define user table
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -14,6 +17,7 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Create type for insert schema
 export const usersRelations = relations(users, ({ many }) => ({
   bookings: many(bookings),
 }));
@@ -50,7 +54,7 @@ export const calculateQuoteSchema = z.object({
   moveDate: z.string().or(z.date()),
   vanSize: z.enum(["small", "medium", "large", "luton"]),
   urgency: z.enum(["standard", "priority", "express"]).optional(),
-  floorAccess: z.enum(["ground", "first", "second", "third", "fourth", "above_fourth"]).optional(),
+  floorAccess: z.enum(["ground", "firstFloor", "secondFloor", "thirdFloorPlus"]).optional(),
   helpers: z.number().int().nonnegative().optional(),
   itemDetails: itemDetailsSchema.optional(),
   items: z.array(itemSchema).optional(), // Direct array of items
@@ -81,7 +85,7 @@ export const driversRelations = relations(drivers, ({ many }) => ({
 
 export const insertDriverSchema = createInsertSchema(drivers).omit({
   id: true,
-  isApproved: true,
+  approvalStatus: true,
   rating: true,
   completedJobs: true,
   createdAt: true,
@@ -91,23 +95,23 @@ export const insertDriverSchema = createInsertSchema(drivers).omit({
 export const bookings = pgTable("bookings", {
   id: serial("id").primaryKey(),
   customerId: integer("customer_id").references(() => users.id),
-  driverId: integer("driver_id").references(() => drivers.id),
+  driverId: integer("driver_id").references(() => drivers.id).notNull(),
   collectionAddress: text("collection_address").notNull(),
   deliveryAddress: text("delivery_address").notNull(),
   moveDate: date("move_date").notNull(),
   vanSize: text("van_size").notNull(),
-  price: integer("price").notNull(),
-  distance: real("distance").notNull(), // Changed from integer to real to support decimal distances
+  price: real("price").notNull(),
+  distance: real("distance").notNull(),
   urgency: text("urgency").default("standard"),
-  status: text("status").notNull().default("pending"),
-  paymentIntentId: text("payment_intent_id"),
-  customerEmail: text("customer_email"),
-  customerPhone: text("customer_phone"),
-  customerName: text("customer_name"),
-  specialRequirements: text("special_requirements"),
+  status: text("status").default("pending"),
   helpers: integer("helpers").default(0),
-  floorAccess: text("floor_access").default("ground"),
+  floorAccess: text("floor_access").notNull().default("ground"),
   createdAt: timestamp("created_at").defaultNow(),
+  customerEmail: text("customer_email").notNull(),
+  customerPhone: text("customer_phone").notNull(),
+  customerName: text("customer_name").notNull(),
+  specialRequirements: text("special_requirements"),
+  paymentIntentId: text("payment_intent_id"),
 });
 
 export const bookingsRelations = relations(bookings, ({ one }) => ({
@@ -123,8 +127,25 @@ export const bookingsRelations = relations(bookings, ({ one }) => ({
 
 export const insertBookingSchema = createInsertSchema(bookings).omit({
   id: true,
+  customerId: true,
+  driverId: true,
   createdAt: true,
-});
+  customerEmail: true,
+  customerPhone: true,
+  customerName: true,
+  specialRequirements: true,
+  paymentIntentId: true,
+  status: true,
+  price: true,
+  distance: true,
+  moveDate: true,
+  vanSize: true,
+  helpers: true,
+  collectionAddress: true,
+  deliveryAddress: true,
+  urgency: true,
+  floorAccess: true,
+} as { [K in keyof typeof bookings.$inferSelect]: true });
 
 // Define dynamic pricing model table
 export const pricingModels = pgTable("pricing_models", {
@@ -179,6 +200,34 @@ export const insertPricingHistorySchema = createInsertSchema(pricingHistory).omi
   timestamp: true,
 });
 
+// Define payment intents table
+export const paymentIntents = pgTable("payment_intents", {
+  id: serial("id").primaryKey(),
+  bookingId: integer("booking_id").references(() => bookings.id),
+  paymentProvider: text("payment_provider").notNull(), // paypal, stripe, etc.
+  providerId: text("provider_id").notNull(), // Payment ID from provider
+  amount: integer("amount").notNull(),
+  currency: text("currency").notNull(),
+  status: text("status").notNull(), // pending, succeeded, failed, refunded
+  method: text("method").notNull(), // card, bank_transfer, etc.
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const paymentIntentsRelations = relations(paymentIntents, ({ one }) => ({
+  booking: one(bookings, {
+    fields: [paymentIntents.bookingId],
+    references: [bookings.id],
+  }),
+}));
+
+export const insertPaymentIntentSchema = createInsertSchema(paymentIntents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Exported types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -197,3 +246,6 @@ export type AreaDemand = typeof areaDemand.$inferSelect;
 
 export type InsertPricingHistory = z.infer<typeof insertPricingHistorySchema>;
 export type PricingHistory = typeof pricingHistory.$inferSelect;
+
+export type InsertPaymentIntent = z.infer<typeof insertPaymentIntentSchema>;
+export type PaymentIntent = typeof paymentIntents.$inferSelect;

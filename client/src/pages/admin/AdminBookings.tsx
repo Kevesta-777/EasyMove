@@ -203,7 +203,6 @@ export default function AdminBookings() {
                       <TableHead>Distance</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Driver</TableHead>
-                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -274,16 +273,7 @@ export default function AdminBookings() {
                               <Badge variant="secondary">Unassigned</Badge>
                             )}
                           </TableCell>
-                          <TableCell>
-                            <div className="flex space-x-2">
-                              <Button variant="ghost" size="sm">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
+
                         </TableRow>
                       ))
                     )}

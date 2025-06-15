@@ -21,6 +21,8 @@ import AdminSignup from "@/pages/admin/AdminSignup";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminBookings from "@/pages/admin/AdminBookings";
 import AdminDrivers from "@/pages/admin/AdminDrivers";
+import AdminUsers from "@/pages/admin/AdminUsers";
+import AdminPayments from "@/pages/admin/AdminPayments";
 
 import BookingConfirmation from "@/pages/BookingConfirmation";
 import StripeConfig from "@/pages/StripeConfig";
@@ -39,6 +41,8 @@ import { withProtectedRoute } from "./components/routing/ProtectedRoute";
 const ProtectedAdminDashboard = withProtectedRoute(AdminDashboard);
 const ProtectedAdminBookings = withProtectedRoute(AdminBookings);
 const ProtectedAdminDrivers = withProtectedRoute(AdminDrivers);
+const ProtectedAdminUsers = withProtectedRoute(AdminUsers);
+const ProtectedAdminPayments = withProtectedRoute(AdminPayments);
 
 function Router() {
   return (
@@ -65,6 +69,8 @@ function Router() {
           <Route path="/admin/dashboard" component={ProtectedAdminDashboard} />
           <Route path="/admin/bookings" component={ProtectedAdminBookings} />
           <Route path="/admin/drivers" component={ProtectedAdminDrivers} />
+          <Route path="/admin/users" component={ProtectedAdminUsers} />
+          <Route path="/admin/payments" component={ProtectedAdminPayments} />
           <Route component={NotFound} />
         </Switch>
       </div>
