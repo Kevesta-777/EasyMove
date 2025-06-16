@@ -578,11 +578,11 @@ export function buildPriceBreakdown(params: {
   const subtotal =
     distanceCharge +
     // timeCharge +
-    // helpersFee +
-    // floorAccessFee +
+    helpersFee +
+    floorAccessFee +
     // fuelCost +
-    returnJourneyCost;
-  // congestionCharge;
+    returnJourneyCost +
+    congestionCharge;
 
   // Apply surcharges
   const peakTimeSurcharge = subtotal * peakTimeSurchargeRate;
