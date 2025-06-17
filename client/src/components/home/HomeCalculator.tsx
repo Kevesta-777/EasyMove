@@ -185,31 +185,56 @@ const HomeCalculator: React.FC = () => {
         },
       );
       console.log("Distance result:", result);
+
+      // Get the server quote response
+      const serverQuote = result.quote;
       
-      // Use the accurate Google Maps distance from the server response
-      // The server already calculated the correct distance using Google Distance Matrix API
-      const serverQuote = result.quote?.total || result.quote?.breakdown || {};
-      
-      // Parse distance from the server's breakdown string which contains the accurate Google Maps distance
-      const distanceBreakdownMatch = serverQuote.breakdown?.find((item: any) => 
-        typeof item === 'string' && item.includes('Distance (') && item.includes('miles)')
-      );
-      
+      if (!serverQuote) {
+        throw new Error("No quote data received from server");
+      }
+
+      // Get the distance directly from the server response
       let distance = 50; // Default fallback
-      if (distanceBreakdownMatch) {
-        const distanceMatch = distanceBreakdownMatch.match(/Distance \((\d+(?:\.\d+)?)\s*miles\)/);
-        if (distanceMatch) {
-          distance = parseFloat(distanceMatch[1]);
+      if (typeof serverQuote.distance === 'number') {
+        distance = serverQuote.distance;
+      } else if (serverQuote.breakdown) {
+        // Fallback: Try to parse from breakdown string
+        const distanceBreakdownMatch = serverQuote.breakdown.find((item: any) =>
+          typeof item === "string" && item.includes("Distance (") && item.includes("miles)"),
+        );
+
+        if (distanceBreakdownMatch) {
+          const distanceMatch = distanceBreakdownMatch.match(/Distance \((\d+(?:\.\d+)?)\s*miles\)/);
+          if (distanceMatch) {
+            distance = parseFloat(distanceMatch[1]);
+          }
+        }
+      }
+
+      // Use the estimatedTime from server response directly
+      let estimatedTimeHours = data.estimatedHours;
+
+      
+      // If we have a server response with estimatedTime, use that
+      if (serverQuote.estimatedTime) {
+        // If it's a string like "2 hours and 28 minutes", parse it
+        if (typeof serverQuote.estimatedTime === 'string') {
+          const hoursMatch = serverQuote.estimatedTime.match(/(\d+)\s*hour/);
+          const minutesMatch = serverQuote.estimatedTime.match(/(\d+)\s*minute/);
+          
+          const hours = hoursMatch ? parseInt(hoursMatch[1]) : 0;
+          const minutes = minutesMatch ? parseInt(minutesMatch[1]) : 0;
+          
+          estimatedTimeHours = hours + (minutes / 60);
+        } else if (typeof serverQuote.estimatedTime === 'number') {
+          // If it's a number, assume it's in minutes
+          estimatedTimeHours = serverQuote.estimatedTime / 60;
         }
       }
       
-      // Extract estimated time from server explanation
-      const estimatedTimeMatch = serverQuote.explanation?.match(/(\d+(?:\.\d+)?)\s*hour/);
-      const estimatedTimeHours = estimatedTimeMatch ? parseFloat(estimatedTimeMatch[1]) : data.estimatedHours;
-      
       console.log("Using Google Maps distance:", distance, "miles");
       console.log("Server breakdown:", serverQuote.breakdown);
-      console.log("Estimated time:", estimatedTimeHours, "hours");
+      console.log("Estimated time from server:", serverQuote.estimatedTime, "parsed to", estimatedTimeHours, "hours");
 
       // Combine time from the form with the date
       const moveDateTime = new Date(data.moveDate);
@@ -235,7 +260,21 @@ const HomeCalculator: React.FC = () => {
         ? data.liftAvailablePickup && data.liftAvailableDelivery
         : true;
 
-      // Calculate the quote
+      // Calculate the quote with Google Maps duration if available
+      let googleMapsDurationMinutes: number | undefined;
+      
+      try {
+        if (serverQuote.estimatedTime) {
+          const timeMatch = serverQuote.estimatedTime.toString().match(/(\d+(\.\d+)?)/);
+          if (timeMatch) {
+            googleMapsDurationMinutes = parseFloat(timeMatch[1]);
+            console.log('Using Google Maps duration (minutes):', googleMapsDurationMinutes);
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing estimated time:', error);
+      }
+
       const calculatedQuote = calculateDetailedQuote({
         pickupAddress: data.pickupAddress,
         deliveryAddress: data.deliveryAddress,
@@ -247,7 +286,15 @@ const HomeCalculator: React.FC = () => {
         floorAccess,
         liftAvailable,
         urgency: data.urgency as UrgencyLevel,
+        googleMapsDurationMinutes,
       });
+      
+      // Override the distance and estimated time with the server values
+      calculatedQuote.distance = distance;
+      if (serverQuote.estimatedTime) {
+        calculatedQuote.estimatedTime = serverQuote.estimatedTime.toString();
+      }
+      
       console.log("Calculated quote:", calculatedQuote);
       // Check for London Congestion Charge
       const inLondon =

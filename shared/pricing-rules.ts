@@ -90,7 +90,6 @@ export const PRICING_CONSTANTS = {
     large: 28, // large van
     luton: 24, // luton van - worst fuel efficiency
   },
-  RETURN_JOURNEY_FACTOR: 0.3, // Return journey at 30% of outbound
 
   // Van size multipliers - updated according to requirements
   VAN_SIZE_MULTIPLIERS: {
@@ -156,23 +155,12 @@ export function calculateDistanceCharge(
         distanceFactor;
   }
 
-  // Calculate fuel cost per mile to incorporate into the per-mile rate
-  // MPG and fuel calculation integrated directly into distance charge
-  const mpg =
-    PRICING_CONSTANTS.AVERAGE_MPG[vanSize] ||
-    PRICING_CONSTANTS.AVERAGE_MPG.medium;
-  const litresPerGallon = 4.54609; // UK gallon
-  const fuelCostPerMile =
-    (1 / mpg) * PRICING_CONSTANTS.FUEL_PRICE_PER_LITRE * litresPerGallon;
-
-  // Add fuel cost to the per-mile rate
-  const totalPerMileRate = perMileRate + fuelCostPerMile;
-
-  // Apply van size multiplier to the total per-mile rate
-  const adjustedPerMileRate = totalPerMileRate * sizeFactor;
-  // Add the distance charge (now includes fuel)
-  // charge += effectiveDistance * adjustedPerMileRate;
-  charge = effectiveDistance * 1.2;
+  // Ensure minimum distance is 20 miles
+  const minimumDistance = 20; // miles
+  const chargedDistance = Math.max(effectiveDistance, minimumDistance);
+  
+  // Calculate distance charge using the formula: Distance * 2 * 1.2
+  charge = chargedDistance * 2 * 1.2;
   return charge;
 }
 
@@ -330,25 +318,7 @@ export function calculateReturnJourneyCost(
   distanceMiles: number,
   vanSize: VanSize = "medium",
 ): number {
-  // Use effective distance - same as main distance charge calculation
-  const effectiveDistance = Math.max(
-    distanceMiles,
-    PRICING_CONSTANTS.MINIMUM_DISTANCE_CHARGE,
-  );
-  const sizeFactor = calculateVanSizeMultiplier(vanSize);
-
-  // Use the lowest per-mile rate for return journey (more efficient, less traffic)
-  const returnRate = PRICING_CONSTANTS.BASE_RATE_PER_MILE_MIN;
-
-  // Apply size factor to the rate
-  const adjustedRate = returnRate * sizeFactor;
-
-  // Calculate return journey cost and apply the return journey factor
-  const returnCost =
-    effectiveDistance * adjustedRate * PRICING_CONSTANTS.RETURN_JOURNEY_FACTOR;
-
-  // Round to avoid floating point issues and improve consistency
-  return Math.round(returnCost * 100) / 100;
+  return 0;
 }
 
 /**
@@ -512,6 +482,7 @@ export function buildPriceBreakdown(params: {
   moveTime?: string;
   urgency: UrgencyLevel;
   inLondon?: boolean;
+  googleMapsDurationMinutes?: number;
 }): {
   totalPrice: number;
   distanceCharge: number;
@@ -551,8 +522,7 @@ export function buildPriceBreakdown(params: {
     vanSize,
     inLondon,
   );
-  // const returnJourneyCost = calculateReturnJourneyCost(distanceMiles, vanSize);
-  const returnJourneyCost = distanceCharge * 0.2;
+  const returnJourneyCost = 0;
 
   // const vanSizeMultiplier = calculateVanSizeMultiplier(vanSize);
   const vanSizeMultiplier = calculateVanSizeMultiplier(vanSize);
@@ -567,83 +537,53 @@ export function buildPriceBreakdown(params: {
   // Calculate additional fees
   const helpersFee = calculateHelperFee(numHelpers, estimatedHours);
   const floorAccessFee = calculateFloorAccessFee(floorAccess, liftAvailable);
-  const fuelCost = calculateFuelCost(distanceMiles, vanSize);
-  const congestionCharge = inLondon ? PRICING_CONSTANTS.CONGESTION_CHARGE : 0;
+  
+  // Removed: fuelCost, congestionCharge, peakTimeSurcharge, urgencySurcharge
+  const fuelCost = 0;
+  const congestionCharge = 0;
+  
+  // Set surcharges to 0 as they are removed
+  const peakTimeSurcharge = 0;
+  const urgencySurcharge = 0;
 
-  // Calculate surcharges
-  const peakTimeSurchargeRate = calculatePeakTimeSurcharge(moveDate, moveTime);
-  const urgencySurchargeRate = calculateUrgencySurcharge(urgency);
+  // Calculate subtotal (van size + helpers + floor access)
+  const subtotal = timeCharge + helpersFee + floorAccessFee;
 
-  // Subtotal before surcharges
-  const subtotal =
-    distanceCharge +
-    // timeCharge +
-    helpersFee +
-    floorAccessFee +
-    // fuelCost +
-    returnJourneyCost +
-    congestionCharge;
+  // Calculate platform fee (25% of subtotal)
+  const platformFee = subtotal * 0.25;
+  
+  // Calculate VAT (20% of platform fee)
+  const vatAmount = platformFee * 0.2;
+  
+  // Calculate driver payment (subtotal - platform fee - VAT)
+  const driverShare = subtotal - platformFee - vatAmount;
+  
+  // Total with VAT (subtotal remains the same, VAT is included in the platform fee calculation)
+  const totalWithVAT = subtotal;
 
-  // Apply surcharges
-  const peakTimeSurcharge = subtotal * peakTimeSurchargeRate;
-  const urgencySurcharge = subtotal * urgencySurchargeRate;
-
-  // Calculate total price
-  let totalPrice = subtotal + peakTimeSurcharge + urgencySurcharge;
-  // Ensure minimum price threshold
-  totalPrice = Math.max(totalPrice, PRICING_CONSTANTS.MINIMUM_PRICE);
-
-  // Round to whole pounds for simplicity
-  totalPrice = Math.ceil(totalPrice);
-
-  // Calculate subtotal before VAT
-  const subtotalBeforeVAT = totalPrice;
-
-  // Calculate total with VAT first (exactly 20% more than subtotal)
-  const totalWithVAT = subtotalBeforeVAT;
-
-  // Calculate platform fee and driver share
-  const { platformFee } = calculateCommissionAndDriverShare(subtotalBeforeVAT);
-
-  // Calculate VAT amount explicitly (20% of pre-VAT amount)
-  const vatAmount = Math.ceil(platformFee * 0.2);
-  const platformPayment = platformFee + vatAmount;
-  const driverShare = subtotalBeforeVAT - (platformFee + vatAmount);
-
-  // Create a breakdown array of charges
+  // Calculate platform payment (VAT + Platform fee)
+  const platformPayment = vatAmount + platformFee;
+  
+  // Build breakdown array - only include non-zero items
   const breakdown = [
     `Distance (${distanceMiles.toFixed(1)} miles): ${formatPrice(distanceCharge)}`,
     `Van size (${vanSize}): ${formatPrice(timeCharge)}`,
-    `Helpers (${numHelpers}): ${formatPrice(helpersFee)}`,
-    floorAccessFee > 0
+    helpersFee > 0 ? `Helpers (${numHelpers}): ${formatPrice(helpersFee)}` : null,
+    floorAccess !== "ground"
       ? `Floor access (${floorAccess}): ${formatPrice(floorAccessFee)}`
       : null,
-    // `Fuel: ${formatPrice(fuelCost)}`,
-    `Return journey: ${formatPrice(returnJourneyCost)}`,
-    congestionCharge > 0
-      ? `Congestion charge: ${formatPrice(congestionCharge)}`
-      : null,
-    peakTimeSurcharge > 0
-      ? `Peak time surcharge (${(peakTimeSurchargeRate * 100).toFixed(0)}%): ${formatPrice(peakTimeSurcharge)}`
-      : null,
-    urgencySurcharge > 0
-      ? `${urgency} service (${(urgencySurchargeRate * 100).toFixed(0)}%): ${formatPrice(urgencySurcharge)}`
-      : null,
-    `Total: ${formatPrice(subtotalBeforeVAT)}`,
-    `VAT (${(PRICING_CONSTANTS.VAT_RATE * 100).toFixed(0)}%): ${formatPrice(vatAmount)}`,
-    // `Total (including VAT): ${formatPrice(totalWithVAT)}`,
-    `Platform fee (25%): ${formatPrice(platformFee)}`,
-    `Platform payment: ${formatPrice(platformPayment)}`,
-    `Driver payment (75%): ${formatPrice(driverShare)}`,
+    `Total: ${formatPrice(subtotal)}`,
+    `VAT (20% of platform fee): ${formatPrice(vatAmount)}`,
+    `Platform fee (25% of subtotal): ${formatPrice(platformFee)}`,
+    `Platform Payment (VAT + Platform fee): ${formatPrice(platformPayment)}`,
+    `Driver payment: ${formatPrice(driverShare)}`,
   ].filter(Boolean) as string[];
-  // Format estimated time with more accurate calculation
-  // const travelTime = estimateTravelTime(distanceMiles, moveDate);
-  // const loadingTime = calculateLoadingTime(
-  //   vanSize,
-  //   floorAccess !== "ground" && !liftAvailable,
-  // );
-  const totalTime = estimatedHours;
-  const estimatedTime = formatDuration(totalTime);
+
+  const totalPrice = totalWithVAT;
+  // Always use Google Maps duration for estimated time (in minutes)
+  const estimatedTime = params.googleMapsDurationMinutes !== undefined 
+    ? formatDuration(params.googleMapsDurationMinutes / 60) 
+    : formatDuration(estimatedHours);
   return {
     totalPrice,
     distanceCharge,
@@ -673,6 +613,7 @@ export function calculateSimpleQuote(params: {
   distanceMiles: number;
   vanSize: VanSize;
   moveDate: Date;
+  googleMapsDurationMinutes?: number;
 }) {
   const { distanceMiles, vanSize, moveDate } = params;
 
@@ -714,6 +655,7 @@ export function calculateSimpleQuote(params: {
     moveDate,
     urgency: "standard",
     inLondon,
+    googleMapsDurationMinutes: params.googleMapsDurationMinutes,
   });
 
   // Return the full quote object for consistency, always using VAT-inclusive prices
