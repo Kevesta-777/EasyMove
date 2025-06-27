@@ -172,27 +172,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         validatedData.deliveryAddress,
       );
 
-      const quote = calculateSimpleQuote({
+      // Google Maps duration is already in minutes (converted in calculateRealDistance)
+      const googleMapsDurationMinutes = distanceResult.estimatedTime;
+      
+      // Log the duration for debugging
+      console.log('Google Maps duration (minutes):', googleMapsDurationMinutes);
+      
+      // Calculate the quote with all details including Google Maps duration
+      const quote = buildPriceBreakdown({
         distanceMiles: distanceResult.distance,
         vanSize: validatedData.vanSize,
-        moveDate: new Date(validatedData.moveDate),
-      });
-
-      const breakdown = buildPriceBreakdown({
-        distanceMiles: distanceResult.distance,
-        vanSize: validatedData.vanSize,
-        estimatedHours: 2,
+        estimatedHours: googleMapsDurationMinutes / 60, // Convert minutes to hours for the function
         numHelpers: validatedData.helpers || 0,
         floorAccess: validatedData.floorAccess as FloorAccess || "ground",
         liftAvailable: false,
         moveDate: new Date(validatedData.moveDate),
         urgency: validatedData.urgency || "standard",
+        googleMapsDurationMinutes: googleMapsDurationMinutes,
       });
+      
+      // Debug log the final formatted time
+      console.log('Formatted estimated time:', quote.estimatedTime);
 
       res.json({
         quote: {
-          total: quote,
-          breakdown,
+          ...quote,
           distance: distanceResult,
           currency: "GBP",
         },

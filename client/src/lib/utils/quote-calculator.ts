@@ -25,6 +25,7 @@ export interface QuoteParams {
   floorAccess: FloorAccess;
   liftAvailable: boolean;
   urgency: UrgencyLevel;
+  googleMapsDurationMinutes?: number;
 }
 
 export interface QuoteResult {
@@ -97,130 +98,67 @@ function isInCongestionZone(address: string): boolean {
  * Calculate a detailed quote using the centralized pricing rules
  */
 export function calculateDetailedQuote(params: QuoteParams): QuoteResult {
-  const {
-    pickupAddress,
-    deliveryAddress,
-    distance,
-    vanSize,
-    moveDate,
-    estimatedHours,
-    helpers,
-    floorAccess,
-    liftAvailable,
-    urgency,
-  } = params;
+  // Validate inputs first
+  const validation = validateQuoteInputs(
+    params.pickupAddress,
+    params.deliveryAddress,
+    params.distance
+  );
+  if (!validation.valid) {
+    throw new Error(validation.message || "Invalid quote parameters");
+  }
 
-  // Check if either address is in a congestion zone
-  const inLondon =
-    isInCongestionZone(pickupAddress) || isInCongestionZone(deliveryAddress);
-  // Get the detailed price breakdown using the central pricing module
-
+  // Calculate the price breakdown using the centralized pricing rules
   const priceBreakdown = buildPriceBreakdown({
-    distanceMiles: distance,
-    vanSize,
-    estimatedHours,
-    numHelpers: helpers,
-    floorAccess,
-    liftAvailable,
-    moveDate,
-    urgency,
-    inLondon,
+    distanceMiles: params.distance,
+    vanSize: params.vanSize,
+    estimatedHours: params.estimatedHours,
+    numHelpers: params.helpers || 0,
+    floorAccess: params.floorAccess || "ground",
+    liftAvailable: params.liftAvailable || false,
+    moveDate: params.moveDate,
+    urgency: params.urgency || "standard",
+    // Pass the Google Maps duration in minutes if available, otherwise use estimatedHours
+    googleMapsDurationMinutes: params.googleMapsDurationMinutes || Math.ceil(params.estimatedHours * 60)
   });
-  // Calculate subtotal (total before platform fee)
-  const subTotal = priceBreakdown.totalPrice - priceBreakdown.platformFee;
 
-  // Build an explanation that summarizes the quote
-  // Always use VAT-inclusive price in the explanation - this ensures consistency with checkout
+  // Calculate platform fee (25% of subtotal)
+  const platformFee = Math.round(priceBreakdown.totalPrice * 0.25 * 100) / 100;
+  // Calculate VAT (20% of platform fee)
+  const vatAmount = Math.round(platformFee * 0.2 * 100) / 100;
+  // Calculate driver payment (subtotal - platform fee - vat)
+  const driverShare = priceBreakdown.totalPrice - platformFee - vatAmount;
+  
+  // Format the estimated time from Google Maps duration (in minutes)
+  const estimatedTimeMinutes = Number(priceBreakdown.estimatedTime) || 0;
+  const hours = Math.floor(estimatedTimeMinutes / 60);
+  const minutes = estimatedTimeMinutes % 60;
+  const formattedTime = hours > 0 
+    ? `${hours} hour${hours !== 1 ? 's' : ''} ${minutes} min${minutes !== 1 ? 's' : ''}`
+    : `${minutes} min${minutes !== 1 ? 's' : ''}`;
+  
+  // Create explanation
+  const explanation = `${formatPrice(priceBreakdown.totalPrice)} for a ${params.vanSize} van, ${params.distance.toFixed(1)} miles.`;
 
-  const explanationPrice =
-    priceBreakdown.totalWithVAT || Math.ceil(priceBreakdown.totalPrice * 1.2);
-  let explanation = `${priceBreakdown.currency}${explanationPrice} for a ${vanSize} van, ${distance.toFixed(1)} miles.`;
-
-  if (helpers > 0) {
-    explanation += ` Includes ${helpers} helper${helpers > 1 ? "s" : ""}.`;
-  }
-
-  if (floorAccess !== "ground") {
-    explanation += ` Includes ${floorAccess} floor access${liftAvailable ? " with lift" : ""}.`;
-  }
-
-  if (urgency !== "standard") {
-    explanation += ` ${urgency.charAt(0).toUpperCase() + urgency.slice(1)} service.`;
-  }
-
-  explanation += ` Estimated time: ${priceBreakdown.estimatedTime}.`;
-
-  // Use VAT calculations from the pricing rules
-  const includesVAT = true; // Always include VAT in the pricing
-
-  // Check if pricing module provides VAT (new version) or we need to calculate (backward compatibility)
-  // Initialize VAT-related variables
-  let vatAmount = 0;
-  let netAmount = 0;
-  let totalWithVAT = 0;
-
-  // Extract the total price safely
-  const totalPrice =
-    typeof priceBreakdown === "object" && priceBreakdown !== null
-      ? (priceBreakdown.totalPrice as number) || 0
-      : 0;
-
-  if (priceBreakdown && typeof priceBreakdown === "object") {
-    if ("vatAmount" in priceBreakdown && "totalWithVAT" in priceBreakdown) {
-      // Use the values from the updated pricing module
-      vatAmount = priceBreakdown.vatAmount as number;
-      totalWithVAT = priceBreakdown.totalWithVAT as number;
-      netAmount = totalPrice; // The totalPrice is now the net price
-    } else {
-      // Backward compatibility: calculate VAT manually
-      // For VAT-exclusive price, use exact 20% for VAT
-      netAmount = totalPrice; // This is the net amount
-      totalWithVAT = Math.ceil(totalPrice * 1.2); // Total with 20% VAT, rounded up
-      vatAmount = Math.round(netAmount * 0.2); // VAT is 20% of the net price
-    }
-  }
-
-  // Recalculate platform fee and driver share based on commission (25% platform, 75% driver)
-  // This overrides the calculation in the pricing rules module to ensure exactly 25%
-  const platformFee = Math.round(totalPrice * 0.25 * 100) / 100;
-  const driverShare = Math.round(totalPrice * 0.75 * 100) / 100;
-
-  // Default values for when priceBreakdown might be missing properties
-  const defaultCurrency = "£";
-  const defaultEstimatedTime = `${Math.ceil(distance / 30)} hours`;
-  // Use VAT-inclusive price in the default explanation
-  const defaultDisplayPrice = totalWithVAT || Math.ceil(totalPrice * 1.2);
-  const defaultExplanation = `${defaultCurrency}${defaultDisplayPrice} for ${vanSize} van, ${distance.toFixed(1)} miles.`;
-
-  // Ensure VAT-inclusive price is always used and prices are consistent
-  const vatInclusivePrice = totalWithVAT || Math.ceil(totalPrice * 1.2);
-
-  // Create the result object with all required fields - ENSURING PRICE CONSISTENCY
+  // Create the result object with all required fields
   return {
     // Basic information
-    totalPrice: vatInclusivePrice, // Always use VAT-inclusive amount for consistency
-    originalPrice: vatInclusivePrice, // Set original price to VAT-inclusive amount
-    finalPrice: vatInclusivePrice, // Set final price to VAT-inclusive amount
-    totalWithVAT: vatInclusivePrice, // Ensure totalWithVAT is properly set
-    subTotal,
-    currency:
-      typeof priceBreakdown === "object" && priceBreakdown?.currency
-        ? priceBreakdown.currency
-        : defaultCurrency,
-    // Always use VAT-inclusive price for priceString
-    priceString: formatPrice(vatInclusivePrice),
-    estimatedTime:
-      typeof priceBreakdown === "object" && priceBreakdown?.estimatedTime
-        ? priceBreakdown.estimatedTime
-        : defaultEstimatedTime,
-    explanation: explanation || defaultExplanation,
+    totalPrice: priceBreakdown.totalPrice,
+    originalPrice: priceBreakdown.totalPrice,
+    finalPrice: priceBreakdown.totalPrice,
+    totalWithVAT: priceBreakdown.totalPrice,
+    subTotal: priceBreakdown.totalPrice,
+    priceString: formatPrice(priceBreakdown.totalPrice),
+    currency: PRICING_CONSTANTS.CURRENCY,
+    estimatedTime: formattedTime,
+    explanation: explanation,
 
     // Location details
-    pickupAddress,
-    deliveryAddress,
-    distance,
-    vanSize,
-    moveDate,
+    pickupAddress: params.pickupAddress,
+    deliveryAddress: params.deliveryAddress,
+    distance: params.distance,
+    vanSize: params.vanSize,
+    moveDate: params.moveDate,
 
     // Price breakdown - safely access properties
     distanceCharge:
@@ -260,12 +198,12 @@ export function calculateDetailedQuote(params: QuoteParams): QuoteResult {
         ? priceBreakdown.congestionCharge
         : 0,
 
-    // Commission and VAT details
-    platformFee,
-    driverShare,
-    includesVAT,
-    vatAmount,
-    netAmount,
+    // Commission and VAT details (calculated on pre-VAT amount)
+    platformFee: Math.round(priceBreakdown.totalPrice * 0.25 * 100) / 100,
+    driverShare: Math.round(priceBreakdown.totalPrice * 0.75 * 100) / 100,
+    includesVAT: true,
+    vatAmount: vatAmount,
+    netAmount: priceBreakdown.totalPrice,
 
     // Additional details
     breakdown:

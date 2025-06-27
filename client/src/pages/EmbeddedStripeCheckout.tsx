@@ -128,13 +128,18 @@ export default function EmbeddedStripeCheckout() {
         return;
       }
 
+      // Find the platform payment line in the breakdown (VAT + Platform fee)
+      const platformPaymentLine = currentQuote.breakdown?.find(item => 
+        item.includes("Platform Payment (VAT + Platform fee)")
+      );
+      
+      // Extract the amount (everything after the colon and trim)
+      const platformPaymentAmount = platformPaymentLine 
+        ? parseFloat(platformPaymentLine.split(":")[1]?.trim().replace(/[^0-9.-]+/g, "") || "0")
+        : quotePrice;
+      
       const paymentData = {
-        amount: parseFloat(
-          currentQuote.breakdown
-            ?.find((item) => item.split(":")[0] === "Platform payment")
-            ?.split(":")[1]
-            ?.replace("£", "") || quotePrice.toString(),
-        ),
+        amount: platformPaymentAmount,
         bookingDetails: {
           pickupAddress: currentQuote.pickupAddress,
           deliveryAddress: currentQuote.deliveryAddress,
@@ -445,8 +450,8 @@ export default function EmbeddedStripeCheckout() {
                       </>
                     ) : (
                       `Pay ${currentQuote.breakdown?.find(
-                        (item) => item.split(":")[0] === "Platform payment",
-                      )}`
+                        (item) => item.includes("Platform Payment"),
+                      )?.split(": ")[1] || '...'}`
                     )}
                   </Button>
                 </form>
